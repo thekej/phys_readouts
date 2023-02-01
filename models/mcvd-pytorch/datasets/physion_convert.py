@@ -47,14 +47,16 @@ def read_video(video_file, original_fps=100, new_fps=25):
                 break
 
         images = []
-        for frame in frames:
+        for i, frame in enumerate(frames):
+            if not i % (original_fps // new_fps) == 0:
+                continue
             img = f['frames'][frame]['images']['_img_cam0'][:]
             img = Image.open(io.BytesIO(img)) # (256, 256, 3)
             pil_im_rsz = img.resize((64, 64), Image.LANCZOS)  
             images.append(pil_im_rsz)
 
         images = np.stack(images)
-        images = images[::(original_fps// new_fps)]
+        #images = images[::(original_fps// new_fps)]
         ## apply frame rate normalization
         label = 1 if target_contacted_zone else 0
         stimulus = f['static']['stimulus_name'][()]
@@ -86,7 +88,7 @@ def make_h5_from_ucf(data_dir, splits_dir, split_idx, image_size, out_dir='./h5_
     h5_maker = UCF101_HDF5Maker(out_dir, num_per_shard=vids_per_shard, force=force_h5, video=True)
 
     print(data_dir)
-    vids_train = glob.glob(os.path.join(data_dir, "**/*.hdf5"))
+    vids_train = glob.glob(os.path.join(data_dir, "**/**/*.hdf5"))
     print("Train:", len(vids_train), "\nTest", len([]))
 
     h5_maker.writer.create_dataset('num_train', data=len(vids_train))
@@ -95,7 +97,7 @@ def make_h5_from_ucf(data_dir, splits_dir, split_idx, image_size, out_dir='./h5_
     
     stimulus_map = {}
     idx = 0
-    for i in tqdm(range(len(videos[:10]))):
+    for i in tqdm(range(len(videos))):
         images, labels, stimulus = process_video(videos[i])
         if isinstance(images, str) and images == "break":
             break
