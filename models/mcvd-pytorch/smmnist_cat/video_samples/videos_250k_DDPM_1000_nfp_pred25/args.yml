@@ -1,0 +1,40 @@
+ckpt: 250000
+command: python main.py --config configs/smmnist_DDPM_big5.yml --data_path /my/data/path/to/datasets
+  --exp smmnist_cat --ni --config_mod sampling.max_data_iter=1000 sampling.num_frames_pred=25
+  sampling.preds_per_test=10 sampling.subsample=100 model.version=DDPM --ckpt 250000
+  --video_gen -v videos_250k_DDPM_1000_nfp_pred25
+comment: ''
+config: configs/smmnist_DDPM_big5.yml
+config_mod:
+- sampling.max_data_iter=1000
+- sampling.num_frames_pred=25
+- sampling.preds_per_test=10
+- sampling.subsample=100
+- model.version=DDPM
+data_path: /my/data/path/to/datasets
+end_ckpt: null
+exp: smmnist_cat
+fast_fid: false
+feats_dir: /home/thekej/physion_readouts/models/mcvd-pytorch/datasets
+fid_batch_size: 1000
+fid_num_samples: null
+final_only: true
+freq: null
+image_folder: images
+interact: false
+log_path: smmnist_cat/logs
+ni: true
+no_ema: false
+no_pr: false
+pr_nn_k: null
+resume_training: false
+sample: false
+seed: 1234
+start_at: 0
+stats_dir: /home/thekej/physion_readouts/models/mcvd-pytorch/datasets
+stats_download: false
+subsample: null
+test: false
+verbose: info
+video_folder: smmnist_cat/video_samples/videos_250k_DDPM_1000_nfp_pred25
+video_gen: true
