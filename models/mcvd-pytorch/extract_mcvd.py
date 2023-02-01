@@ -52,7 +52,7 @@ def extract(args):
     # load data
     dataset = get_dataset(args, config)
 
-    test_loader = DataLoader(dataset, batch_size=config.training.batch_size, shuffle=False,
+    test_loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False,
                          num_workers=config.data.num_workers, drop_last=False)
     data_size = 0
     for t, label in test_loader:
@@ -91,7 +91,7 @@ def extract(args):
         init = init_samples(len(real), config)
         import time
         t = time.time()
-        pred, gamma, beta, mid = sampler(init, scorenet, cond=cond, cond_mask=cond_mask, subsample=100, verbose=True)
+        pred, gamma, beta, mid = sampler(init, scorenet, cond=cond, cond_mask=cond_mask, subsample=args.sub, verbose=True)
         print('one processing: ', time.time() - t)
         if args.latent_type == 'middle_embeds':
             features_array[:, 0, :, :, :] =  mid.cpu().numpy()
@@ -117,7 +117,7 @@ def extract(args):
             else:
                 cond = pred
             init = init_samples(len(real), config)
-            pred, a, e, v = sampler(init, scorenet, cond=cond, cond_mask=cond_mask, subsample=100, verbose=True)
+            pred, a, e, v = sampler(init, scorenet, cond=cond, cond_mask=cond_mask, subsample=args.sub, verbose=True)
             if args.latent_type == 'middle_embeds':
                 features_array[:, j, :, :, :] =  mid.cpu().numpy()
             if args.latent_type == 'gamma':
@@ -126,13 +126,13 @@ def extract(args):
                 features_array[:, j, :, :, :] =  beta.cpu().numpy()
             
         print('whole processing: ', time.time() - t)
-        if pred.shape[0] == config.training.batch_size:
-            dset1[i * config.training.batch_size: (i+1)*config.training.batch_size, :, :, :, :] = features_array
-            dset2[i * config.training.batch_size: (i+1)*config.training.batch_size] = label
+        if pred.shape[0] == args.batch_size:
+            dset1[i * args.batch_size: (i+1)*args.batch_size, :, :, :, :] = features_array
+            dset2[i * args.batch_size: (i+1)*args.batch_size] = label
 
         else:
-            dset1[i * config.training.batch_size:, :, :, :, :] = features_array
-            dset2[i * config.training.batch_size:] = label
+            dset1[i * args.batch_size:, :, :, :, :] = features_array
+            dset2[i * args.batch_size:] = label
 
         
 if __name__ == '__main__':
@@ -148,6 +148,8 @@ if __name__ == '__main__':
                         default='middle_embeds', help="Latent type")
     parser.add_argument("--video_length", type=int, default=20, help="Length of the video in frames")
     parser.add_argument("--stimuli_length", type=int, default=12, help="Length of the stimuli in frames")
+    parser.add_argument("--batch_size", type=int, default=256, help="Length of the stimuli in frames")
+    parser.add_argument("--sub", type=int, default=100, help="Length of the stimuli in frames")
     parser.add_argument("--num_samples", type=int, default=1, help="Number of samples to generate")
     parser.add_argument("--save_file", type=str, default='file.hdf5', help="Path to the output hdf5")
     
