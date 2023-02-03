@@ -35,7 +35,7 @@ class UCF101_HDF5Maker(HDF5Maker):
             self.writer[str(self.count)].create_dataset(str(i), data=frame, dtype=dtype, compression="lzf")
 
 
-def read_video(video_file, original_fps=100, new_fps=25):
+def read_video(video_file, original_fps=100, new_fps=25, context_length = 12, pred_length=4):
     
     with h5py.File(video_file, 'r') as f: # load ith hdf5 file from list
         frames = list(f['frames'])
@@ -56,7 +56,7 @@ def read_video(video_file, original_fps=100, new_fps=25):
             images.append(pil_im_rsz)
 
         images = np.stack(images)
-        #images = images[::(original_fps// new_fps)]
+        images = images[context_length-pred_length:]
         ## apply frame rate normalization
         label = 1 if target_contacted_zone else 0
         stimulus = f['static']['stimulus_name'][()]

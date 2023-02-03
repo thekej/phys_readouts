@@ -62,7 +62,7 @@ def extract(args):
     if args.readout_type == 'SIMULATION':
         n_features = 1 + args.video_length // PRED_LENGTH
     elif args.readout_type == 'PAST':
-        n_features = 1 + args.stimuli_length // PRED_LENGTH
+        n_features = 1
     elif args.readout_type == 'COMPLETE':
         n_features = 1 + args.video_length // PRED_LENGTH
         
@@ -99,6 +99,7 @@ def extract(args):
             features_array[:, 0, :, :, :] =  gamma.cpu().numpy()
         if args.latent_type == 'beta':
             features_array[:, 0, :, :, :] =  beta.cpu().numpy()
+            
         for j in range(1, n_features):
             if args.readout_type == 'SIMULATION':
                 if 4*j <= args.stimuli_length:
