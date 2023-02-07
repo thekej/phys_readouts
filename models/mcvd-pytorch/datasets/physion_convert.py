@@ -82,7 +82,8 @@ def process_video(video_file):
 
 
 
-def make_h5_from_ucf(data_dir, splits_dir, split_idx, image_size, out_dir='./h5_ds', vids_per_shard=100000, force_h5=False):
+def make_h5_from_ucf(data_dir, splits_dir, split_idx, image_size, out_dir='./h5_ds', 
+        vids_per_shard=100000, minimum_length_required=8, force_h5=False):
 
     # H5 maker
     h5_maker = UCF101_HDF5Maker(out_dir, num_per_shard=vids_per_shard, force=force_h5, video=True)
@@ -93,14 +94,14 @@ def make_h5_from_ucf(data_dir, splits_dir, split_idx, image_size, out_dir='./h5_
     vids_train = list(set(vids_train) - set(corrupt))
     print("Train:", len(vids_train), "\nTest", len([]))
 
-    h5_maker.writer.create_dataset('num_train', data=len(vids_train))
-    h5_maker.writer.create_dataset('num_test', data=len([]))
     videos = vids_train
     
     stimulus_map = {}
-    idx = 0
+    idx, count = 0, 0
     for i in tqdm(range(len(videos))):
         images, labels, stimulus = process_video(videos[i])
+        if images.shape[0] < minimum_length_required:
+            continue
         if isinstance(images, str) and images == "break":
             break
             
@@ -109,7 +110,11 @@ def make_h5_from_ucf(data_dir, splits_dir, split_idx, image_size, out_dir='./h5_
             stimulus_map[str(stimulus)] = idx
             idx += 1
         #print(stimulus)
+        count += 1
         h5_maker.add_data((images, labels, stimulus_map[str(stimulus)]), dtype='uint8')
+
+    h5_maker.writer.create_dataset('num_train', data=count)
+    h5_maker.writer.create_dataset('num_test', data=len([]))    
 
     h5_maker.close()
     
@@ -130,8 +135,10 @@ if __name__ == "__main__":
     parser.add_argument('--image_size', type=int, default=64)
     parser.add_argument('--vids_per_shard', type=int, default=100000)
     parser.add_argument('--force_h5', type=eval, default=False)
-
+    parser.add_argument('--min_length_required', type=int, default=8)
+    
     args = parser.parse_args()
 
     make_h5_from_ucf(out_dir=args.out_dir, data_dir=args.ucf_dir, splits_dir=args.splits_dir, split_idx=args.split_idx,
-                     image_size=args.image_size, vids_per_shard=args.vids_per_shard, force_h5=args.force_h5)
+                     image_size=args.image_size, vids_per_shard=args.vids_per_shard, 
+                     force_h5=args.force_h5, minimum_length_required=args.min_length_required)

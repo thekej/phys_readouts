@@ -31,10 +31,11 @@ PRED_LENGTH = 4
 def get_dataset(args, config):
     
     frames_per_sample = args.video_length + args.stimuli_length
-
     dataset = PhysionDataset(args.data_path, frames_per_sample=frames_per_sample, 
-                                     image_size=config.data.image_size, train=False, random_time=True,
-                                     random_horizontal_flip=False) #change this
+                             image_size=config.data.image_size, train=False, random_time=True,
+                             random_horizontal_flip=False,
+                             complete=args.readout_type == 'COMPLETE',
+                             simulation=args.readout_type == 'SIMULATION') #change this
 
     return dataset
 
@@ -57,7 +58,7 @@ def extract(args):
     data_size = 0
     for t, label in test_loader:
         data_size += t.shape[0]
-    print(data_size)
+    print('Dataset size: ', data_size)
     # 
     if args.readout_type == 'SIMULATION':
         n_features = 1 + args.video_length // PRED_LENGTH
@@ -102,14 +103,14 @@ def extract(args):
             
         for j in range(1, n_features):
             if args.readout_type == 'SIMULATION':
-                if 4*j <= args.stimuli_length:
+                if 4*j < args.stimuli_length:
                     real, cond, cond_mask = conditioning_fn(config, input_frames[:, 4*j:4*j+8, :, :, :], 
                                                         num_frames_pred=config.data.num_frames,
                                             prob_mask_cond=getattr(config.data, 'prob_mask_cond', 0.0),
                                             prob_mask_future=getattr(config.data, 'prob_mask_future', 0.0))
                 else:
                     cond = pred
-            elif args.readout_type in ['PAST', 'COMPLETE'] :
+            elif args.readout_type == 'COMPLETE':
                 real, cond, cond_mask = conditioning_fn(config, input_frames[:, 4*j:4*j+8, :, :, :], 
                                                         num_frames_pred=config.data.num_frames,
                                             prob_mask_cond=getattr(config.data, 'prob_mask_cond', 0.0),
@@ -148,7 +149,7 @@ if __name__ == '__main__':
     parser.add_argument("--latent_type", type=str, choices=["middle_embeds", "gamma", "beta"], 
                         default='middle_embeds', help="Latent type")
     parser.add_argument("--video_length", type=int, default=20, help="Length of the video in frames")
-    parser.add_argument("--stimuli_length", type=int, default=12, help="Length of the stimuli in frames")
+    parser.add_argument("--stimuli_length", type=int, default=4, help="Length of the stimuli in frames")
     parser.add_argument("--batch_size", type=int, default=256, help="Length of the stimuli in frames")
     parser.add_argument("--sub", type=int, default=100, help="Length of the stimuli in frames")
     parser.add_argument("--num_samples", type=int, default=1, help="Number of samples to generate")

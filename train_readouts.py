@@ -18,7 +18,7 @@ def train(args):
     random.seed(10)
     torch.manual_seed(42)
     indices = range(args.data_size)
-    train_set = set(random.sample(indices, int(len(indices) * 0.8)))
+    train_set = set(random.sample(indices, int(len(indices) * 0.9)))
     val_set = set(indices) - train_set
     
     # Load the data

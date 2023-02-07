@@ -24,7 +24,7 @@ def objective(trial, args):
     
     #Split data
     indices = range(args.data_size)
-    train_set = set(random.sample(indices, int(len(indices) * 0.8)))
+    train_set = set(random.sample(indices, int(len(indices) * 0.9)))
     val_set = set(indices) - train_set
     
     # Load the data
@@ -91,7 +91,7 @@ if __name__ == '__main__':
         print("    {}: {}".format(key, value))
         res[key] = value
 
-    with open('params.json', 'w') as f:
+    with open(args.save_path, 'w') as f:
         import json 
 
         json.dump(res, f)
