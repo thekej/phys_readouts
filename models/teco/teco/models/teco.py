@@ -82,7 +82,7 @@ class TECO(nn.Module):
                                    cond=deter)
         z_t = self.codebook(None, encoding_indices=sample)
         recon = jnp.argmax(self.decoder(deter, z_t), axis=-1)
-        return z_t, recon
+        return z_t, recon, deter
 
     def readout_timestep(self, z_embeddings, actions, cond):
         actions = self.action_embeds(actions)

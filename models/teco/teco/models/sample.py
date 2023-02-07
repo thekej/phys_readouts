@@ -14,12 +14,9 @@ def _observe(state, encodings):
 def _imagine(state, z_embeddings, actions, cond, t, rng):
     variables = {'params': state.params, **state.model_state}
     rng, new_rng = jax.random.split(rng)
-    import time
-    t_ = time.time()
     z, recon = model.apply(variables, z_embeddings, actions, cond, t,
                             method=model.sample_timestep,
                             rngs={'sample': rng}) 
-    print('inside imagine: ', time.time() - t_)
     return recon, z, new_rng
 
 def _readout_h(state, z_embeddings, actions, cond, rng):
@@ -167,7 +164,8 @@ def readout_h_run(sample_model, state, video, actions, seed=0, state_spec=None):
 
     return readout_embed 
 
-def readout_z_run(sample_model, state, video, actions, seed=0, state_spec=None):
+def readout_z_run(sample_model, state, video, actions, seed=0, state_spec=None, 
+                  scenario='past', seq_len=45, open_loop_ctx = 1, eval_seq_len=45):
     global model
     model = sample_model
 
@@ -181,7 +179,8 @@ def readout_z_run(sample_model, state, video, actions, seed=0, state_spec=None):
     rngs = jax.random.split(rngs, num_local_data)
 
     assert video.shape[0] == num_local_data, f'{video.shape}, {num_local_data}'
-    assert model.config.n_cond <= model.config.open_loop_ctx
+    if scenario in ['past' , 'complete']:
+        assert seq_len == eval_seq_len
 
     if not model.config.use_actions:
         if actions is None:
@@ -208,27 +207,31 @@ def readout_z_run(sample_model, state, video, actions, seed=0, state_spec=None):
         p_imagine = jax.pmap(_imagine, in_axes=(0, 0, 0, 0, None, 0))
                      
     cond, zs = p_observe(state, encodings)
-    zs = zs[:, :, :model.config.seq_len - model.config.n_cond]
+    zs = zs[:, :, :seq_len - model.config.n_cond]
     recon = [encodings[:, :, i] for i in range(model.config.open_loop_ctx)]
     dummy_encoding = jnp.zeros_like(recon[0])
-    itr = list(range(model.config.open_loop_ctx, model.config.eval_seq_len))
+    
+    z_hats, hs = zs, []
+    
+    # simu: open_loop_ctx = 45, eval_seq_len = 300
+    
+    itr = list(range(open_loop_ctx, eval_seq_len))
     for i in tqdm(itr):
-        if i >= model.config.seq_len:
-            encodings = jnp.stack([*recon[-model.config.seq_len + 1:], dummy_encoding], axis=2)
+        if i >= seq_len and scenario == 'simulation':
+            encodings = jnp.stack([*recon[-seq_len + 1:], dummy_encoding], axis=2)
             cond, zs = p_observe(state, encodings)
-            act = actions[:, :, i - model.config.seq_len + 1:i + 1]
+            act = actions[:, :, i - seq_len + 1:i + 1]
             i = model.config.seq_len - 1
         else:
             act = actions[:, :, :model.config.seq_len]
-        import time
-        ti = time.time()
-        r, z, rngs = p_imagine(state, zs, act, cond, i, rngs)
-        t_ = time.time()
-        print('after imagine: ',t_ - ti)
-        ti = time.time()
-        zs = zs.at[:, :, i - model.config.n_cond].set(z)
-        t_ = time.time()
-        print(t_ - ti)
+        r, z, h, rngs = p_imagine(state, zs, act, cond, i, rngs)
+        z_hats.append(z)
+        hs.append(h)
+        #print(zs.shape, z.shape, i, model.config.n_cond, i - model.config.n_cond)
+        if scenario == 'simulation':
+            zs = zs.at[:, :, i - model.config.n_cond].set(z)
         recon.append(r)
     encodings = jnp.stack(recon, axis=2)
-    return encodings, zs
+    z_hats = jnp.stack(z_hats, axis=2)
+    hs = jnp.stack(hs, axis=2)
+    return encodings, z_hats, hs
