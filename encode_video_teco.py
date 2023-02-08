@@ -54,6 +54,7 @@ def process_video(video_file, video_length, return_length_only=False):
             img = Image.open(io.BytesIO(img)) # (256, 256, 3)
             pil_image = img.resize((128, 128), Image.LANCZOS) 
             pil_image = np.expand_dims(np.array(pil_image), axis=0)
+            pil_image = 2 * (pil_image / 255.0) - 1
             pil_image = jax.numpy.array(pil_image)
             images.append(pil_image)
         
