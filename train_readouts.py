@@ -22,6 +22,7 @@ def train(args):
     val_set = set(indices) - train_set
     
     # Load the data
+    print('load_data')
     train_dataset = readout_feats_loader.FeaturesDataset(args.data_path, list(train_set))
     val_dataset = readout_feats_loader.FeaturesDataset(args.data_path, list(val_set))
     test_dataset = readout_feats_loader.FeaturesDataset(args.test_path)   
@@ -37,6 +38,7 @@ def train(args):
                             pin_memory=True)
 
     # Load the model
+    print('load_model')
     inputs, labels = next(iter(train_loader))
     input_shape = inputs.shape
     model = get_model(args.model_name, input_shape, args.weight_decay, args.lr)

@@ -17,12 +17,9 @@ def normalize(args):
     test_labels = test_data['label'][:]
     
     # transformation func
-    #pool = nn.AdaptiveAvgPool2d((1, 1))
-    #feats = pool(torch.tensor(features))
-    #test_feats = pool(torch.tensor(test_features))
-    
-    feats = torch.tensor(features)
-    test_feats = torch.tensor(test_features)
+    pool = nn.AdaptiveAvgPool2d((1, 1))
+    feats = pool(torch.tensor(features))
+    test_feats = pool(torch.tensor(test_features))
     
     # Normalize the data
     # Apply same transformation for train and test
