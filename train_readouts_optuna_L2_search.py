@@ -16,7 +16,7 @@ from utils.train_utils import get_model
 
 def objective(trial, args):
     weight_decay = trial.suggest_float("weight_decay", 1e-6, 1e-1)
-    lr = trial.suggest_float("lr", 1e-8, 1e-1)
+    lr = trial.suggest_float("lr", 1e-8, 1e-3)
     
     #set seed for reproducing experiments
     random.seed(10)
@@ -30,7 +30,6 @@ def objective(trial, args):
     # Load the data
     train_dataset = readout_feats_loader.FeaturesDataset(args.data_path, list(train_set))
     val_dataset = readout_feats_loader.FeaturesDataset(args.data_path, list(val_set))
-    test_dataset = readout_feats_loader.FeaturesDataset(args.test_path, list(val_set))    
     
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, 
                               num_workers=args.num_workers, persistent_workers=True, 
@@ -91,7 +90,7 @@ if __name__ == '__main__':
         print("    {}: {}".format(key, value))
         res[key] = value
 
-    with open(args.save_path, 'w') as f:
+    with open(args.save_path+'params.json', 'w') as f:
         import json 
 
         json.dump(res, f)

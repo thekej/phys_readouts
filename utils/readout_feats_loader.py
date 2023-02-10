@@ -3,13 +3,12 @@ import numpy as np
 
 from torch.utils.data import Dataset, DataLoader
 
-
 class FeaturesDataset(Dataset):
     def __init__(self, h5_path, set_ = None):
         self.indices = set_
-        with h5py.File(h5_path, 'r') as hf:
-            self.features = hf['features'][:]
-            self.labels = hf['label'][:]
+        data = h5py.File(h5_path)
+        self.features = data['features'][:]
+        self.labels = data['label']
 
     def __len__(self):
         if not self.indices is None:

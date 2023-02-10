@@ -24,7 +24,7 @@ def train(args):
     # Load the data
     train_dataset = readout_feats_loader.FeaturesDataset(args.data_path, list(train_set))
     val_dataset = readout_feats_loader.FeaturesDataset(args.data_path, list(val_set))
-    test_dataset = readout_feats_loader.FeaturesDataset(args.test_path)    
+    test_dataset = readout_feats_loader.FeaturesDataset(args.test_path)   
 
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, 
                               num_workers=args.num_workers, persistent_workers=True, 
@@ -47,15 +47,19 @@ def train(args):
         min_epochs=args.n_epochs,
         max_epochs=args.n_epochs,
         default_root_dir=args.save_path,
-        auto_lr_find=True,
         log_every_n_steps=10,
         check_val_every_n_epoch= 5)
     trainer.fit(model, train_loader, val_loader)
     
+    if args.debug == 'debug':
+        trainer.test(dataloaders=train_loader)
+        
     trainer.test(dataloaders=test_loader, ckpt_path="best")
+    
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train a model')
+    parser.add_argument('--debug', type=str, default=None, help='Debug mode')
     parser.add_argument('--model-name', type=str, help='The model class to use')
     parser.add_argument('--data-path', type=str, help='The path to the h5 file')
     parser.add_argument('--test-path', type=str, help='The path to the test file')
