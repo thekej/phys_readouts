@@ -6,6 +6,7 @@ import jax
 import yaml
 import pickle
 
+print(os.getcwd())
 from models.teco.teco.train_utils import seed_all
 from models.teco.teco.models import load_ckpt, readout_z_run, readout_h_run
 from models.teco.teco.data import Data
@@ -36,11 +37,11 @@ def main(args):
     if args.open_loop_ctx is not None:
         kwargs['open_loop_ctx'] = args.open_loop_ctx
     print('load model')
-    model, state, config = load_ckpt(args.ckpt, return_config=True, 
-                                     **kwargs, data_path=args.data_path,
-                                     vqvae_ckpt=args.vqvae_ckpt)
+    #model, state, config = load_ckpt(args.ckpt, return_config=True, 
+    #                                 **kwargs, data_path=args.data_path,
+    #                                 vqvae_ckpt=args.vqvae_ckpt)
 
-    #config = pickle.load(open(osp.join(args.ckpt, 'args'), 'rb'))
+    config = pickle.load(open(osp.join(args.ckpt, 'args'), 'rb'))
     for k, v in kwargs.items():
         setattr(config, k, v)
 
@@ -60,7 +61,9 @@ def main(args):
     data = Data(config)
     loader = data.create_iterator(train=False, prefetch=False, repeat=False)
     batch = next(loader)
-
+    print(batch['actions'].shape)
+    print(batch['video'])
+    exit()
     MAX_BATCH = min(MAX_BATCH, args.batch_size)
     B = MAX_BATCH // jax.local_device_count()
     idx = 0
@@ -75,11 +78,13 @@ def main(args):
         if args.embeddings == 'h':
             hs  += [readout_h_run(model, state, v_in, act_in, seed=args.seed)]
         else:
-            x, z = readout_z_run(model, state, v_in, act_in, seed=args.seed)
+            x, z, h = readout_z_run(model, state, v_in, act_in, seed=args.seed)
             xs += [x]
             zs += [z]
+            hs += [h]
             print('x : ', x.shape)
             print('z : ', z.shape)
+            print('h : ', h.shape)
 
 
     print('Saved to', folder)
