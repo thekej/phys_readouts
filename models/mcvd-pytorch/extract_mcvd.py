@@ -74,7 +74,10 @@ def extract(args):
         f1, f2, f3 = 288, 64, 64
     else:
         f1, f2, f3 = 1152, 8, 8
-        
+
+    # Spatin layers are not affected by the sampling so make sampling minimal
+    if args.latent_type != 'middle_embeds':
+        args.sub = 1
     
     # set up new dataset
     f = h5py.File(args.save_file, "w")
@@ -103,6 +106,7 @@ def extract(args):
         init = init_samples(len(real), config)
         import time
         t = time.time()
+        print(args.sub)
         pred, gamma, beta, mid = sampler(init, scorenet, cond=cond, cond_mask=cond_mask, subsample=args.sub, verbose=True)
         print('one processing: ', time.time() - t)
         if args.latent_type == 'middle_embeds':
