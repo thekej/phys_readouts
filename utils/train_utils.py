@@ -24,7 +24,7 @@ class BinaryClassificationWrapper(LightningModule):
         y_hat = self.forward(x)
         loss = F.binary_cross_entropy(y_hat.squeeze(1), y)
         accuracy = torch.mean(((y_hat.squeeze(1) > 0.5).float() == y).float())
-        self.log('train_accuracy', accuracy, on_step=True)
+        self.log('train_accuracy', accuracy, on_step=True, prog_bar=True)
         self.log("train_loss", loss)
         return loss
     
@@ -49,13 +49,10 @@ class BinaryClassificationWrapper(LightningModule):
     
     def configure_optimizers(self):
         optimizer = optim.Adam(self.parameters(), lr=self.lr, weight_decay=self.weight_decay) 
-        if self.use_lr_schedule:
-            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, 
-                                                               patience=10, verbose=True, threshold=0.0001, 
-                                                               threshold_mode='rel', cooldown=0, 
-                                                               min_lr=0, eps=1e-08)
-            return {"optimizer": optimizer, "lr_scheduler": scheduler, "monitor": "train_loss"}
-        return optimizer
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.7, 
+                                                               patience=30, verbose=True)
+        return {"optimizer": optimizer, "lr_scheduler": scheduler, "monitor": "train_loss"}
+        #return optimizer
                                       
 
 def get_model(model_name, input_size, weight_decay=1e-1, learning_rate=1e-3, scheduler=False):
