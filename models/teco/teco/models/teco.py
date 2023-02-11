@@ -72,6 +72,7 @@ class TECO(nn.Module):
     def sample_timestep(self, z_embeddings, actions, cond, t):
         t -= self.config.n_cond
         actions = self.action_embeds(actions)
+
         deter = self.temporal_transformer(
             z_embeddings, actions, cond, deterministic=True
         )
@@ -86,6 +87,7 @@ class TECO(nn.Module):
 
     def readout_timestep(self, z_embeddings, actions, cond):
         actions = self.action_embeds(actions)
+
         deter = self.temporal_transformer(
             z_embeddings, actions, cond, deterministic=True
         )

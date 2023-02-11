@@ -14,10 +14,10 @@ def _observe(state, encodings):
 def _imagine(state, z_embeddings, actions, cond, t, rng):
     variables = {'params': state.params, **state.model_state}
     rng, new_rng = jax.random.split(rng)
-    z, recon = model.apply(variables, z_embeddings, actions, cond, t,
+    z, recon, h = model.apply(variables, z_embeddings, actions, cond, t,
                             method=model.sample_timestep,
                             rngs={'sample': rng}) 
-    return recon, z, new_rng
+    return recon, z, h, new_rng
 
 def _readout_h(state, z_embeddings, actions, cond, rng):
     variables = {'params': state.params, **state.model_state}
@@ -120,7 +120,8 @@ def sample(sample_model, state, video, actions, seed=0, state_spec=None):
 
     return samples, video 
 
-def readout_h_run(sample_model, state, video, actions, seed=0, state_spec=None):
+# ONLY used for past
+def readout_h_run(sample_model, state, video, actions, seed=0, state_spec=None, seq_len=45):
     global model
     model = sample_model
 
@@ -145,6 +146,7 @@ def readout_h_run(sample_model, state, video, actions, seed=0, state_spec=None):
         devices = jax.local_devices()[:video.shape[0]]
     else:
         devices = None
+        
     _, encodings = jax.pmap(model.vq_fns['encode'], devices=devices)(video)
 
     if use_xmap:
@@ -158,14 +160,15 @@ def readout_h_run(sample_model, state, video, actions, seed=0, state_spec=None):
     else:
         p_observe = jax.pmap(_observe)
         p_imagine = jax.pmap(_readout_h, in_axes=(0, 0, 0, 0, 0))
-    
+        
     cond, zs = p_observe(state, encodings)
-    readout_embed = p_imagine(state, zs, actions, cond, rngs)
+    act = actions[:, :, :seq_len]
+    readout_embed = p_imagine(state, zs, act, cond, rngs)
 
     return readout_embed 
 
 def readout_z_run(sample_model, state, video, actions, seed=0, state_spec=None, 
-                  scenario='past', seq_len=45, open_loop_ctx = 1, eval_seq_len=45):
+                  scenario='past', seq_len=45, open_loop_ctx=45):
     global model
     model = sample_model
 
@@ -179,8 +182,6 @@ def readout_z_run(sample_model, state, video, actions, seed=0, state_spec=None,
     rngs = jax.random.split(rngs, num_local_data)
 
     assert video.shape[0] == num_local_data, f'{video.shape}, {num_local_data}'
-    if scenario in ['past' , 'complete']:
-        assert seq_len == eval_seq_len
 
     if not model.config.use_actions:
         if actions is None:
@@ -192,6 +193,7 @@ def readout_z_run(sample_model, state, video, actions, seed=0, state_spec=None,
         devices = jax.local_devices()[:video.shape[0]]
     else:
         devices = None
+        
     _, encodings = jax.pmap(model.vq_fns['encode'], devices=devices)(video)
 
     if use_xmap:
@@ -208,26 +210,18 @@ def readout_z_run(sample_model, state, video, actions, seed=0, state_spec=None,
                      
     cond, zs = p_observe(state, encodings)
     zs = zs[:, :, :seq_len - model.config.n_cond]
-    recon = [encodings[:, :, i] for i in range(model.config.open_loop_ctx)]
+    recon = [encodings[:, :, i] for i in range(open_loop_ctx)]
+    z_hats = [zs[:, :, i] for i in range(open_loop_ctx)]
     dummy_encoding = jnp.zeros_like(recon[0])
     
-    z_hats, hs = zs, []
-    
-    # simu: open_loop_ctx = 45, eval_seq_len = 300
-    
-    itr = list(range(open_loop_ctx, eval_seq_len))
+    hs = []
+        
+    itr = list(range(open_loop_ctx, seq_len))
     for i in tqdm(itr):
-        if i >= seq_len and scenario == 'simulation':
-            encodings = jnp.stack([*recon[-seq_len + 1:], dummy_encoding], axis=2)
-            cond, zs = p_observe(state, encodings)
-            act = actions[:, :, i - seq_len + 1:i + 1]
-            i = model.config.seq_len - 1
-        else:
-            act = actions[:, :, :model.config.seq_len]
+        act = actions[:, :, :seq_len]
         r, z, h, rngs = p_imagine(state, zs, act, cond, i, rngs)
         z_hats.append(z)
         hs.append(h)
-        #print(zs.shape, z.shape, i, model.config.n_cond, i - model.config.n_cond)
         if scenario == 'simulation':
             zs = zs.at[:, :, i - model.config.n_cond].set(z)
         recon.append(r)
