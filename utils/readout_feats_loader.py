@@ -22,6 +22,6 @@ class FeaturesDataset(Dataset):
         if not self.indices is None:
             index = self.indices[index]
         x = self.features[index]
-        #nn.AdaptiveAvgPool2d((1, 1))(torch.tensor(x))
+        x = nn.AdaptiveAvgPool2d((1, 1))(torch.tensor(x))
         y = self.labels[index].astype(np.float32)
         return x, y

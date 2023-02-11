@@ -77,8 +77,14 @@ if __name__ == '__main__':
     func = lambda trial: objective(trial, args)
 
     # Pass func to Optuna studies
-    study = optuna.create_study(direction='maximize')
-    study.optimize(func, n_trials=100)
+    sampler = optuna.samplers.CmaEsSampler(
+        use_separable_cma=True
+    )
+    study = optuna.create_study(sampler=sampler, direction='maximize')
+    
+    print(f"Sampler is {study.sampler.__class__.__name__}")
+    exit()
+    study.optimize(func, n_trials=200)
 
     print("Best trial:")
     trial = study.best_trial
