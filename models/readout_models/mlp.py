@@ -5,7 +5,7 @@ import torch.nn.functional as F
 
 # Define the Multi-layer Perceptron Model
 class MLP(nn.Module):
-    def __init__(self, input_size, hidden_size=128, num_classes=1):
+    def __init__(self, input_size, hidden_size=1024, num_classes=1):
         super().__init__()
         input_dim = 1
         for dim in input_size[1:]:

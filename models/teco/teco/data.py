@@ -141,11 +141,12 @@ class Data:
             def process(features):
                 video = tf.cast(features['video'], tf.int32)
                 T = tf.shape(video)[0]
-                start_idx = tf.random.uniform((), 0, T - seq_len + 1, dtype=tf.int32)
+                start_idx = 0#tf.random.uniform((), 0, T - seq_len + 1, dtype=tf.int32)
                 video = tf.identity(video[start_idx:start_idx + seq_len])
                 actions = tf.cast(features['actions'], tf.int32)
                 actions = tf.identity(actions[start_idx:start_idx + seq_len])
-                return dict(video=video, actions=actions)
+                labels = tf.cast(features['label'], tf.int32)
+                return dict(video=video, actions=actions, label=labels)
 
             split = tfds.split_for_jax_process(split_name, process_index=ds_shard_id,
                                                process_count=num_ds_shards)

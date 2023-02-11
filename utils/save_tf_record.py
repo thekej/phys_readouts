@@ -11,8 +11,9 @@ def main(args):
     h5_file = h5py.File(args.data, "r")
 
     # Load the videos and actions from the file
-    videos = h5_file["video"][:]
-    actions = h5_file["action"][:]
+    videos = h5_file["video"]
+    actions = h5_file["action"]
+    labels = h5_file["label"]
 
     # Define the features 
     # TODO fix this add more stuff
@@ -21,6 +22,16 @@ def main(args):
         "content":{
             "features": {
                 "actions": {
+                    "pythonClassName": "tensorflow_datasets.core.features.tensor_feature.Tensor",
+                    "tensor": {
+                        "shape": {
+                            "dimensions": ["-1"]
+                        },
+                        "dtype": "int32",
+                        "encoding": "none"
+                    }
+                },
+                "label": {
                     "pythonClassName": "tensorflow_datasets.core.features.tensor_feature.Tensor",
                     "tensor": {
                         "shape": {
@@ -57,10 +68,12 @@ def main(args):
         # Create a feature for each video and action
         video_feature = tf.train.Feature(int64_list=tf.train.Int64List(value=videos[i].flatten().astype(np.uint16)))
         action_feature = tf.train.Feature(int64_list=tf.train.Int64List(value=actions[i]))
+        label_feature = tf.train.Feature(int64_list=tf.train.Int64List(value=[labels[i]]))
         # Create a Features object for the record
         features = tf.train.Features(feature={
             "video": video_feature,
-            "actions": action_feature
+            "actions": action_feature,
+            "label": label_feature
         })
         # Create an Example object for the record
         example = tf.train.Example(features=features)

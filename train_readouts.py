@@ -15,8 +15,8 @@ from utils.train_utils import get_model
 
 def train(args):
     #Get train-test splits
-    random.seed(10)
-    torch.manual_seed(42)
+    random.seed(0)
+    torch.manual_seed(0)
     indices = range(args.data_size)
     train_set = set(random.sample(indices, int(len(indices) * 0.9)))
     val_set = set(indices) - train_set
