@@ -14,6 +14,10 @@ def main(args):
     videos = h5_file["video"]
     actions = h5_file["action"]
     labels = h5_file["label"]
+    stimulus = h5_file["stimulus"]
+    
+    with open(args.stimuli_map, 'r') as f:
+        s_map = json.load(f)
 
     # Define the features 
     # TODO fix this add more stuff
@@ -32,6 +36,16 @@ def main(args):
                     }
                 },
                 "label": {
+                    "pythonClassName": "tensorflow_datasets.core.features.tensor_feature.Tensor",
+                    "tensor": {
+                        "shape": {
+                            "dimensions": ["-1"]
+                        },
+                        "dtype": "int32",
+                        "encoding": "none"
+                    }
+                },
+                "stimulus": {
                     "pythonClassName": "tensorflow_datasets.core.features.tensor_feature.Tensor",
                     "tensor": {
                         "shape": {
@@ -69,11 +83,13 @@ def main(args):
         video_feature = tf.train.Feature(int64_list=tf.train.Int64List(value=videos[i].flatten().astype(np.uint16)))
         action_feature = tf.train.Feature(int64_list=tf.train.Int64List(value=actions[i]))
         label_feature = tf.train.Feature(int64_list=tf.train.Int64List(value=[labels[i]]))
+        stimulus_feature = tf.train.Feature(int64_list=tf.train.Int64List(value=[s_map[stimulus[i]]]))
         # Create a Features object for the record
         features = tf.train.Features(feature={
             "video": video_feature,
             "actions": action_feature,
-            "label": label_feature
+            "label": label_feature,
+            "stimulus": stimulus_feature
         })
         # Create an Example object for the record
         example = tf.train.Example(features=features)
@@ -102,6 +118,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', '--data', type=str, required=True)
+    parser.add_argument('-d', '--stimuli_map', type=str, required=True)
     parser.add_argument('-s', '--save_path', type=str, required=True)
     args = parser.parse_args()
 
