@@ -74,32 +74,46 @@ def extract(args):
         f1, f2, f3 = 288, 64, 64
     else:
         f1, f2, f3 = 1152, 8, 8
-        
+
+    # Spatin layers are not affected by the sampling so make sampling minimal
+    if args.latent_type != 'middle_embeds':
+        args.sub = 1
     
     # set up new dataset
     f = h5py.File(args.save_file, "w")
-    dset1 = f.create_dataset("features", (data_size, n_features, f1, f2, f3), dtype='f')
-    dset2 = f.create_dataset("label", (data_size,), dtype='f')
-    #dset3 = f.create_dataset("scenario", (len(test_loader),), dtype='i')
+    if not args.latent_type == 'middle_embeds':
+        dset1 = f.create_dataset("features_beta", (data_size, n_features, f1, f2, f3), dtype='f')
+        dset2 = f.create_dataset("label", (data_size,), dtype='f')
+        dset3 = f.create_dataset("features_gamma", (data_size, n_features, f1, f2, f3), dtype='f')
+    else:
+        dset1 = f.create_dataset("features", (data_size, n_features, f1, f2, f3), dtype='f')
+        dset2 = f.create_dataset("label", (data_size,), dtype='f')
+        #dset3 = f.create_dataset("scenario", (len(test_loader),), dtype='i')
 
     # extract features
     for i, (test_x, label) in enumerate(test_loader):
         input_frames = data_transform(config, test_x)
-        features_array = np.zeros((test_x.shape[0], n_features, f1, f2, f3))
+        if not args.latent_type == 'middle_embeds':
+            features_array = {'gamma': np.zeros((test_x.shape[0], n_features, f1, f2, f3)),
+                              'beta': np.zeros((test_x.shape[0], n_features, f1, f2, f3))
+                             }
+        else:
+            features_array = np.zeros((test_x.shape[0], n_features, f1, f2, f3))
+        
         real, cond, cond_mask = conditioning_fn(config, input_frames[:, :8, :, :, :], num_frames_pred=config.data.num_frames,
                                             prob_mask_cond=getattr(config.data, 'prob_mask_cond', 0.0),
                                             prob_mask_future=getattr(config.data, 'prob_mask_future', 0.0))
         init = init_samples(len(real), config)
         import time
         t = time.time()
+        print(args.sub)
         pred, gamma, beta, mid = sampler(init, scorenet, cond=cond, cond_mask=cond_mask, subsample=args.sub, verbose=True)
         print('one processing: ', time.time() - t)
         if args.latent_type == 'middle_embeds':
             features_array[:, 0, :, :, :] =  mid.cpu().numpy()
-        if args.latent_type == 'gamma':
-            features_array[:, 0, :, :, :] =  gamma.cpu().numpy()
-        if args.latent_type == 'beta':
-            features_array[:, 0, :, :, :] =  beta.cpu().numpy()
+        else:
+            features_array['gamma'][:, 0, :, :, :] =  gamma.cpu().numpy()
+            features_array['beta'][:, 0, :, :, :] =  beta.cpu().numpy()
             
         for j in range(1, n_features):
             if args.readout_type == 'SIMULATION':
@@ -122,20 +136,28 @@ def extract(args):
             pred, a, e, v = sampler(init, scorenet, cond=cond, cond_mask=cond_mask, subsample=args.sub, verbose=True)
             if args.latent_type == 'middle_embeds':
                 features_array[:, j, :, :, :] =  mid.cpu().numpy()
-            if args.latent_type == 'gamma':
-                features_array[:, j, :, :, :] =  gamma.cpu().numpy()
-            if args.latent_type == 'beta':
-                features_array[:, j, :, :, :] =  beta.cpu().numpy()
+            else:
+                features_array['gamma'][:, j, :, :, :] =  gamma.cpu().numpy()
+                features_array['beta'][:, j, :, :, :] =  beta.cpu().numpy()
             
         print('whole processing: ', time.time() - t)
-        if pred.shape[0] == args.batch_size:
-            dset1[i * args.batch_size: (i+1)*args.batch_size, :, :, :, :] = features_array
-            dset2[i * args.batch_size: (i+1)*args.batch_size] = label
+        if args.latent_type == 'middle_embeds':   
+            if pred.shape[0] == args.batch_size:
+                dset1[i * args.batch_size: (i+1)*args.batch_size, :, :, :, :] = features_array
+                dset2[i * args.batch_size: (i+1)*args.batch_size] = label
 
+            else:
+                dset1[i * args.batch_size:, :, :, :, :] = features_array
+                dset2[i * args.batch_size:] = label
         else:
-            dset1[i * args.batch_size:, :, :, :, :] = features_array
-            dset2[i * args.batch_size:] = label
-
+            if pred.shape[0] == args.batch_size:
+                dset1[i * args.batch_size: (i+1)*args.batch_size, :, :, :, :] = features_array['beta']
+                dset2[i * args.batch_size: (i+1)*args.batch_size] = label
+                dset3[i * args.batch_size: (i+1)*args.batch_size, :, :, :, :] = features_array['gamma']
+            else:
+                dset1[i * args.batch_size:, :, :, :, :] = features_array['beta']
+                dset2[i * args.batch_size:] = label
+                dset3[i * args.batch_size:, :, :, :, :] = features_array['gamma']
         
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
