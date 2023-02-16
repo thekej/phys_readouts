@@ -71,7 +71,7 @@ def extract(args):
         
     # if gamma beta 288, 64, 64 if mid 1152, 8, 8
     if not args.latent_type == 'middle_embeds':
-        f1, f2, f3 = 288, 64, 64
+        f1, f2, f3 = 288, 1, 1
     else:
         f1, f2, f3 = 1152, 8, 8
 
@@ -112,8 +112,11 @@ def extract(args):
         if args.latent_type == 'middle_embeds':
             features_array[:, 0, :, :, :] =  mid.cpu().numpy()
         else:
-            features_array['gamma'][:, 0, :, :, :] =  gamma.cpu().numpy()
-            features_array['beta'][:, 0, :, :, :] =  beta.cpu().numpy()
+            gamma = nn.AdaptiveAvgPool3d((None, 1, 1))(gamma.cpu())
+            beta = nn.AdaptiveAvgPool3d((None, 1, 1))(beta.cpu())
+            print(gamma.shape, beta.shape)
+            features_array['gamma'][:, 0, :, :, :] =  gamma.numpy()
+            features_array['beta'][:, 0, :, :, :] =  beta.numpy()
             
         for j in range(1, n_features):
             if args.readout_type == 'SIMULATION':
@@ -137,8 +140,10 @@ def extract(args):
             if args.latent_type == 'middle_embeds':
                 features_array[:, j, :, :, :] =  mid.cpu().numpy()
             else:
-                features_array['gamma'][:, j, :, :, :] =  gamma.cpu().numpy()
-                features_array['beta'][:, j, :, :, :] =  beta.cpu().numpy()
+                gamma = nn.AdaptiveAvgPool3d((None, 1, 1))(gamma.cpu())
+                beta = nn.AdaptiveAvgPool3d((None, 1, 1))(beta.cpu())
+                features_array['gamma'][:, j, :, :, :] =  gamma.numpy()
+                features_array['beta'][:, j, :, :, :] =  beta.numpy()
             
         print('whole processing: ', time.time() - t)
         if args.latent_type == 'middle_embeds':   
