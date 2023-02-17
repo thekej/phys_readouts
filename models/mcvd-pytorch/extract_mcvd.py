@@ -7,7 +7,7 @@ import torch
 import h5py
 from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
-
+from torch import nn
 
 from load_model_from_ckpt import load_model, get_readout_sampler, init_samples
 from datasets import get_dataset, data_transform, inverse_data_transform

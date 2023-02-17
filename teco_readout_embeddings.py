@@ -8,6 +8,8 @@ import pickle
 import tqdm 
 import h5py
 
+from torch import nn
+
 from models.teco.teco.train_utils import seed_all
 from models.teco.teco.models import load_ckpt, readout_z_run, readout_h_run
 from models.teco.teco.data import Data
@@ -67,20 +69,29 @@ def main(args):
             if (i+1)*args.batch_size < data_size:
                 dset2[i*args.batch_size:(i+1)*args.batch_size]  = h.reshape(-1, 1, 8, 8, 256)
             else:
-                dset2[i*args.batch_size:]  = h.reshape(-1, 8, 8, 256)
+                dset2[i*args.batch_size:]  = h.reshape(-1, 1, 8, 8, 256)
             
         else:
             x, z, h = readout_z_run(model, state, v_in, act_in, seed=args.seed,
                                     scenario=args.scenario, seq_len=args.seq_len,
                                     open_loop_ctx=args.open_loop_ctx)
+            # reshape
+            x = x.reshape(-1, n_features, 16, 16)
+            z = z.reshape(-1, n_features, 8, 8, 256)
+            h = h.reshape(-1, n_features - args.open_loop_ctx, 8, 8, 256)
+            # aggregate
+            x = nn.AdaptiveAvgPool2d((1, 1))(torch.tensor(x))
+            z = nn.AdaptiveAvgPool3d((None, None, 1))(torch.tensor(z))
+            h = nn.AdaptiveAvgPool3d((None, None, 1))(torch.tensor(h))
+            # add to data
             if (i+1)*args.batch_size < data_size:#(8, 4, 50, 16, 16) (8, 4, 50, 8, 8, 256) (8, 4, 5, 8, 8, 256)
-                dset2[i*args.batch_size:(i+1)*args.batch_size] = x.reshape(-1, n_features, 16, 16)
-                dset3[i*args.batch_size:(i+1)*args.batch_size] = z.reshape(-1, n_features, 8, 8, 256)
-                dset4[i*args.batch_size:(i+1)*args.batch_size] = h.reshape(-1, n_features - args.open_loop_ctx, 8, 8, 256)
+                dset2[i*args.batch_size:(i+1)*args.batch_size] = x.numpy()
+                dset3[i*args.batch_size:(i+1)*args.batch_size] = z.numpy()
+                dset4[i*args.batch_size:(i+1)*args.batch_size] = h.numpy()
             else:
-                dset2[i*args.batch_size:] = x.reshape(-1, n_features, 16, 16)
-                dset3[i*args.batch_size:] = z.reshape(-1, n_features, 8, 8, 256)
-                dset4[i*args.batch_size:] = h.reshape(-1, n_features - args.open_loop_ctx, 8, 8, 256)
+                dset2[i*args.batch_size:] = x.numpy()
+                dset3[i*args.batch_size:] = z.numpy()
+                dset4[i*args.batch_size:] = h.numpy()
 
     f.close()
 
