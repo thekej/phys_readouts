@@ -71,9 +71,9 @@ def extract(args):
         
     # if gamma beta 288, 64, 64 if mid 1152, 8, 8
     if not args.latent_type == 'middle_embeds':
-        f1, f2, f3 = 288, 1, 1
+        f1, f2, f3 = 288, 2, 2
     else:
-        f1, f2, f3 = 1152, 8, 8
+        f1, f2, f3 = 1152, 1, 1 
 
     # Spatin layers are not affected by the sampling so make sampling minimal
     if args.latent_type != 'middle_embeds':
@@ -88,7 +88,6 @@ def extract(args):
     else:
         dset1 = f.create_dataset("features", (data_size, n_features, f1, f2, f3), dtype='f')
         dset2 = f.create_dataset("label", (data_size,), dtype='f')
-        #dset3 = f.create_dataset("scenario", (len(test_loader),), dtype='i')
 
     # extract features
     for i, (test_x, label) in enumerate(test_loader):
@@ -106,15 +105,14 @@ def extract(args):
         init = init_samples(len(real), config)
         import time
         t = time.time()
-        print(args.sub)
         pred, gamma, beta, mid = sampler(init, scorenet, cond=cond, cond_mask=cond_mask, subsample=args.sub, verbose=True)
         print('one processing: ', time.time() - t)
         if args.latent_type == 'middle_embeds':
-            features_array[:, 0, :, :, :] =  mid.cpu().numpy()
+            mid = nn.AdaptiveAvgPool3d((None, 1, 1))(mid.cpu())
+            features_array[:, 0, :, :, :] =  mid.numpy()
         else:
-            gamma = nn.AdaptiveAvgPool3d((None, 1, 1))(gamma.cpu())
-            beta = nn.AdaptiveAvgPool3d((None, 1, 1))(beta.cpu())
-            print(gamma.shape, beta.shape)
+            gamma = nn.AdaptiveAvgPool3d((None, 2, 2))(gamma.cpu())
+            beta = nn.AdaptiveAvgPool3d((None, 2, 2))(beta.cpu())
             features_array['gamma'][:, 0, :, :, :] =  gamma.numpy()
             features_array['beta'][:, 0, :, :, :] =  beta.numpy()
             
@@ -138,10 +136,11 @@ def extract(args):
             init = init_samples(len(real), config)
             pred, a, e, v = sampler(init, scorenet, cond=cond, cond_mask=cond_mask, subsample=args.sub, verbose=True)
             if args.latent_type == 'middle_embeds':
-                features_array[:, j, :, :, :] =  mid.cpu().numpy()
+                mid = nn.AdaptiveAvgPool3d((None, 1, 1))(mid.cpu())
+                features_array[:, j, :, :, :] =  mid.numpy()
             else:
-                gamma = nn.AdaptiveAvgPool3d((None, 1, 1))(gamma.cpu())
-                beta = nn.AdaptiveAvgPool3d((None, 1, 1))(beta.cpu())
+                gamma = nn.AdaptiveAvgPool3d((None, 2, 2))(gamma.cpu())
+                beta = nn.AdaptiveAvgPool3d((None, 2, 2))(beta.cpu())
                 features_array['gamma'][:, j, :, :, :] =  gamma.numpy()
                 features_array['beta'][:, j, :, :, :] =  beta.numpy()
             
