@@ -35,15 +35,16 @@ def train(args):
     
     # Load the data
     print('load_data')
-    train_dataset = readout_feats_loader.FeaturesDataset(args.data_path, list(train_set))
-    val_dataset = readout_feats_loader.FeaturesDataset(args.data_path, list(val_set))
+    train_dataset = readout_feats_loader.FeaturesDataset(args.data_path, list(train_set), scenario=args.scenario)
+    val_dataset = readout_feats_loader.FeaturesDataset(args.data_path, list(val_set), scenario=args.scenario)
     if args.all_but_one is not None:
         with open(args.s_maptest, 'r') as f:
             scenarios_indices = json.load(f)
             test_dataset = readout_feats_loader.FeaturesDataset(args.test_path, 
-                                                                scenarios_indices[args.all_but_one])
+                                                                scenarios_indices[args.all_but_one],
+                                                                scenario=args.scenario)
     else:
-        test_dataset = readout_feats_loader.FeaturesDataset(args.test_path)
+        test_dataset = readout_feats_loader.FeaturesDataset(args.test_path, scenario=, scenario=args.scenario)
 
 
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, 
@@ -86,6 +87,7 @@ if __name__ == '__main__':
     parser.add_argument('--test-path', type=str, help='The path to the test file')
     parser.add_argument('--data-size', type=int, required=True, help='Dataset size')
     parser.add_argument('--save-path', type=str, help='The path to save the checkpoints')
+    parser.add_argument('--scenario', type=str, default='complete')
     parser.add_argument('--all-but-one', type=str, default=None,
                         choices=['coll', 'domino', 'link', 'towers', 
                                  'contain', 'drop', 'roll'],
@@ -108,3 +110,4 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     train(args)
+
