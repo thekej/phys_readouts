@@ -44,7 +44,7 @@ def train(args):
                                                                 scenarios_indices[args.all_but_one],
                                                                 scenario=args.scenario)
     else:
-        test_dataset = readout_feats_loader.FeaturesDataset(args.test_path, scenario=, scenario=args.scenario)
+        test_dataset = readout_feats_loader.FeaturesDataset(args.test_path, scenario=args.scenario)
 
 
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, 
