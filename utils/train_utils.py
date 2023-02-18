@@ -34,7 +34,7 @@ class BinaryClassificationWrapper(LightningModule):
         y_hat = self.forward(x)
         loss = F.binary_cross_entropy(y_hat.squeeze(1), y)#.unsqueeze(1))
         accuracy = torch.mean(((y_hat.squeeze(1) > 0.5).float() == y).float())
-        self.log('val_accuracy', accuracy, on_step=True)
+        self.log('val_accuracy', accuracy, on_step=True, prog_bar=True)
         self.log("val_loss", loss)
         return loss
         

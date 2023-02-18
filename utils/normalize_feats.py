@@ -12,7 +12,7 @@ def normalize(args):
     features = data['features'+args.spatin][:]
     labels = data['label'][:]
     
-    test_data = h5py.File(args.input)
+    test_data = h5py.File(args.test_input)
     test_features = test_data['features'+args.spatin][:]
     test_labels = test_data['label'][:]
     
@@ -42,7 +42,7 @@ if __name__ == "__main__":
     parser.add_argument("--test_input", type=str, required=True, help="input hdf5 file")
     parser.add_argument("--output", type=str, required=True, help="output hdf5 file")
     parser.add_argument("--test_output", type=str, required=True, help="output hdf5 file")
-    parser.add_argument("--spatin", type=str, default='', choices=['_h', '_x', '_z'])
+    parser.add_argument("--spatin", type=str, default='', choices=['_beta', '_gamma'])
     args = parser.parse_args()
     
     normalize(args)
