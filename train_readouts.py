@@ -18,11 +18,12 @@ def train(args):
     #Get train-test splits
     random.seed(0)
     torch.manual_seed(0)
-    indices = range(args.data_size)
+    with open(args.balanced_indices, 'r') as f:
+        indices = json.load(f)
     
     # account for all but one train protocol
     if args.all_but_one is not None:
-        with open(args.s_map, 'r') as f:
+        with open(args.train_scenario_map, 'r') as f:
             scenarios_indices = json.load(f)
             banned_scenario = scenarios_indices[args.all_but_one]
             indices = list(set(indices) - set(banned_scenario))
@@ -38,7 +39,7 @@ def train(args):
     train_dataset = readout_feats_loader.FeaturesDataset(args.data_path, list(train_set), scenario=args.scenario)
     val_dataset = readout_feats_loader.FeaturesDataset(args.data_path, list(val_set), scenario=args.scenario)
     if args.all_but_one is not None:
-        with open(args.s_maptest, 'r') as f:
+        with open(args.test_scenario_map, 'r') as f:
             scenarios_indices = json.load(f)
             test_dataset = readout_feats_loader.FeaturesDataset(args.test_path, 
                                                                 scenarios_indices[args.all_but_one],
@@ -46,8 +47,7 @@ def train(args):
     else:
         test_dataset = readout_feats_loader.FeaturesDataset(args.test_path, scenario=args.scenario)
 
-
-    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, 
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True,
                               num_workers=args.num_workers, persistent_workers=True, 
                               pin_memory=True)
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, 
@@ -56,7 +56,7 @@ def train(args):
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, 
                             num_workers=args.num_workers, persistent_workers=True, 
                             pin_memory=True)
-
+    
     # Load the model
     print('load_model')
     inputs, labels = next(iter(train_loader))
@@ -92,9 +92,11 @@ if __name__ == '__main__':
                         choices=['coll', 'domino', 'link', 'towers', 
                                  'contain', 'drop', 'roll'],
                         help='in case of all-but-one scenario')
-    parser.add_argument('--s-map', type=str, default='/ccn2/u/thekej/mcvd_feats/s_map.json', 
+    parser.add_argument('--balanced-indices', type=str, required=True, 
                         help='path for scenario mapping')
-    parser.add_argument('--s-maptest', type=str, default='/ccn2/u/thekej/mcvd_feats/s_map_test.json', 
+    parser.add_argument('--train-scenario-map', type=str, required=True, 
+                        help='path for scenario mapping')
+    parser.add_argument('--test-scenario-map', type=str, required=True, 
                         help='path for scenario mapping')
     # Acceleration params
     parser.add_argument('--num-gpus', type=int, default=1, help='Number of gpu devices to train on')

@@ -6,15 +6,31 @@ def map_(args):
     with open(args.stimuli_path) as f:
         stimuli = json.load(f)
 
-    scenarios = {'coll' : [], 'domino': [], 'link': [], 
+    scenarios = {'collision' : [], 'domino': [], 'link': [], 
                  'towers': [], 'contain': [], 'drop': [], 
                  'roll': []}
-
+    e = 0
     for stimulus in stimuli.keys():
-        for scenario in scenarios.keys():
-            if scenario in stimulus:
-                scenarios[scenario] += [stimuli[stimulus]]
-                break
+        # this needs to be hardcoded due pilot_it2_rollingSliding_simple_collision_box_large_force_0025 this type of naming
+        if 'coll' in stimulus and not 'roll' in stimulus:
+            scenarios['collision'] += [stimuli[stimulus]]
+        elif 'coll' in stimulus and 'roll' in stimulus:
+            scenarios['roll'] += [stimuli[stimulus]]
+        elif 'roll' in stimulus:
+            scenarios['roll'] += [stimuli[stimulus]]
+        elif 'domino' in stimulus:
+            scenarios['domino'] += [stimuli[stimulus]]
+        elif 'link' in stimulus:
+            scenarios['link'] += [stimuli[stimulus]]
+        elif 'towers' in stimulus:
+            scenarios['towers'] += [stimuli[stimulus]]
+        elif 'contain' in stimulus:
+            scenarios['contain'] += [stimuli[stimulus]]
+        elif 'drop' in stimulus:
+            scenarios['drop'] += [stimuli[stimulus]]
+                
+    for s in scenarios.keys():
+        print('%s has %d'%(s, len(scenarios[s])))
 
     with open(args.save_path, 'w') as f:
         json.dump(scenarios, f)

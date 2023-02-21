@@ -89,8 +89,8 @@ def make_h5_from_ucf(data_dir, splits_dir, split_idx, image_size, out_dir='./h5_
     h5_maker = UCF101_HDF5Maker(out_dir, num_per_shard=vids_per_shard, force=force_h5, video=True)
 
     print(data_dir)
-    vids_train = glob.glob(os.path.join(data_dir, "**/**/*.hdf5"))
-    corrupt = glob.glob(os.path.join(data_dir, '**/**/temp.hdf5'))
+    vids_train = glob.glob(os.path.join(data_dir, "**/*.hdf5"))
+    corrupt = glob.glob(os.path.join(data_dir, '**/temp.hdf5'))
     vids_train = list(set(vids_train) - set(corrupt))
     print("Train:", len(vids_train), "\nTest", len([]))
 
