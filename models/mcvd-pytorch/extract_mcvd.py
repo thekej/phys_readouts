@@ -76,7 +76,7 @@ def extract(args):
         f1, f2, f3 = 1152, 1, 1 
 
     # Spatin layers are not affected by the sampling so make sampling minimal
-    if args.latent_type != 'middle_embeds':
+    if args.latent_type != 'middle_embeds' and args.readout_type == 'COMPLETE':
         args.sub = 1
     
     # set up new dataset
@@ -166,7 +166,7 @@ def extract(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_path", type=str, 
-                        default='/ccn2/u/thekej/phys_readouts_mcvd/', help="Path to the data")
+                        required=True, help="Path to the data")
     parser.add_argument("--model_path", type=str, 
                         default = "/ccn2/u/thekej/ucf10132_big192_288_4c4_unetm_spade/logs/",
                         help="Path to the model")
