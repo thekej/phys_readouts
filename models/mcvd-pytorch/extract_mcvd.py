@@ -134,7 +134,7 @@ def extract(args):
             else:
                 cond = pred
             init = init_samples(len(real), config)
-            pred, a, e, v = sampler(init, scorenet, cond=cond, cond_mask=cond_mask, subsample=args.sub, verbose=True)
+            pred, gamma, beta, mid = sampler(init, scorenet, cond=cond, cond_mask=cond_mask, subsample=args.sub, verbose=True)
             if args.latent_type == 'middle_embeds':
                 mid = nn.AdaptiveAvgPool3d((None, 1, 1))(mid.cpu())
                 features_array[:, j, :, :, :] =  mid.numpy()

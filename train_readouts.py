@@ -18,6 +18,7 @@ def train(args):
     #Get train-test splits
     random.seed(0)
     torch.manual_seed(0)
+    torch.set_float32_matmul_precision('high')
     with open(args.balanced_indices, 'r') as f:
         indices = json.load(f)
     
@@ -27,7 +28,7 @@ def train(args):
             scenarios_indices = json.load(f)
             banned_scenario = scenarios_indices[args.all_but_one]
             indices = list(set(indices) - set(banned_scenario))
-            print('Removing %d datapoints from the %s scenario'%(args.data_size - len(indices),
+            print('Removing %d datapoints from the %s scenario'%(len(banned_scenario),
                                                                  args.all_but_one))
             
     #split data
@@ -85,11 +86,10 @@ if __name__ == '__main__':
     # data params
     parser.add_argument('--data-path', type=str, help='The path to the h5 file')
     parser.add_argument('--test-path', type=str, help='The path to the test file')
-    parser.add_argument('--data-size', type=int, required=True, help='Dataset size')
     parser.add_argument('--save-path', type=str, help='The path to save the checkpoints')
     parser.add_argument('--scenario', type=str, default='complete')
     parser.add_argument('--all-but-one', type=str, default=None,
-                        choices=['coll', 'domino', 'link', 'towers', 
+                        choices=['collision', 'domino', 'link', 'towers', 
                                  'contain', 'drop', 'roll'],
                         help='in case of all-but-one scenario')
     parser.add_argument('--balanced-indices', type=str, required=True, 
