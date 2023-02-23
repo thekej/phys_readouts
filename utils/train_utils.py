@@ -52,7 +52,7 @@ class BinaryClassificationWrapper(LightningModule):
         optimizer = torch.optim.LBFGS(self.parameters(), lr=self.lr, max_iter=50)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.7, 
                                                                patience=10, verbose=True)
-        return {"optimizer": optimizer, "lr_scheduler": scheduler, "monitor": "train_loss"}
+        return {"optimizer": optimizer, "lr_scheduler": scheduler, "monitor": "val_loss"}
         #return optimizer
                                       
 
