@@ -14,7 +14,11 @@ def map_(args):
                  'roll': []}
 
     for s in scenarios.keys():
-        train_dataset = readout_feats_loader.FeaturesDataset(args.data_path, 
+        if args.data_type == 'r3m':
+            train_dataset = readout_feats_loader.R3MFeaturesDataset(args.data_path, 
+                                                         scenarios[s])
+        else:
+            train_dataset = readout_feats_loader.FeaturesDataset(args.data_path, 
                                                          scenarios[s])
         
         labels = train_dataset.labels[:][scenarios[s]]
@@ -49,12 +53,14 @@ def map_(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--map-path', type=str, default=None,
-                        help='Path for video file')
+                        help='Path for indices map file')
     parser.add_argument('--data-path', type=str, default=None,
-                        help='Path for video file')
+                        help='Path for features file')
+    parser.add_argument('--data-type', type=str, default=None,
+                        help='r3m | mcvd | teco')
     parser.add_argument('--save-scenario', type=str, default=None,
-                        help='Path for output-directory')
+                        help='Save path for scenario dict')
     parser.add_argument('--save-path', type=str, default=None,
-                        help='Path for output-directory')
+                        help='Save path for balanced train set')
     args = parser.parse_args()
     map_(args)

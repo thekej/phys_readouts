@@ -13,15 +13,10 @@ from torch.utils.data import Dataset, DataLoader
 from utils import readout_feats_loader
 from utils.train_utils import get_model
 
-
-def train(args):
-    #Get train-test splits
-    random.seed(0)
-    torch.manual_seed(0)
-    torch.set_float32_matmul_precision('high')
+def get_data(args):
     with open(args.balanced_indices, 'r') as f:
         indices = json.load(f)
-    
+        
     # account for all but one train protocol
     if args.all_but_one is not None:
         with open(args.train_scenario_map, 'r') as f:
@@ -35,18 +30,43 @@ def train(args):
     train_set = set(random.sample(indices, int(len(indices) * 0.9)))
     val_set = set(indices) - train_set
     
+    if args.data_type == 'mcvd':
+        train_dataset = readout_feats_loader.FeaturesDataset(args.data_path, list(train_set), scenario=args.scenario)
+        val_dataset = readout_feats_loader.FeaturesDataset(args.data_path, list(val_set), scenario=args.scenario)
+
+        if args.all_but_one is not None:
+            with open(args.test_scenario_map, 'r') as f:
+                scenarios_indices = json.load(f)
+                test_dataset = readout_feats_loader.FeaturesDataset(args.test_path, 
+                                                                    scenarios_indices[args.all_but_one],
+                                                                    scenario=args.scenario)
+        else:
+            test_dataset = readout_feats_loader.FeaturesDataset(args.test_path, scenario=args.scenario)
+    elif args.data_type == 'r3m':
+        train_dataset = readout_feats_loader.R3MFeaturesDataset(args.data_path, list(train_set), scenario=args.scenario)
+        val_dataset = readout_feats_loader.R3MFeaturesDataset(args.data_path, list(val_set), scenario=args.scenario)
+
+        if args.all_but_one is not None:
+            with open(args.test_scenario_map, 'r') as f:
+                scenarios_indices = json.load(f)
+                test_dataset = readout_feats_loader.R3MFeaturesDataset(args.test_path, 
+                                                                    scenarios_indices[args.all_but_one],
+                                                                    scenario=args.scenario)
+        else:
+            test_dataset = readout_feats_loader.R3MFeaturesDataset(args.test_path, scenario=args.scenario)
+        
+    return train_dataset, val_dataset, test_dataset
+
+
+def train(args):
+    #Get train-test splits
+    random.seed(0)
+    torch.manual_seed(0)
+    torch.set_float32_matmul_precision('high')
+    
     # Load the data
     print('load_data')
-    train_dataset = readout_feats_loader.FeaturesDataset(args.data_path, list(train_set), scenario=args.scenario)
-    val_dataset = readout_feats_loader.FeaturesDataset(args.data_path, list(val_set), scenario=args.scenario)
-    if args.all_but_one is not None:
-        with open(args.test_scenario_map, 'r') as f:
-            scenarios_indices = json.load(f)
-            test_dataset = readout_feats_loader.FeaturesDataset(args.test_path, 
-                                                                scenarios_indices[args.all_but_one],
-                                                                scenario=args.scenario)
-    else:
-        test_dataset = readout_feats_loader.FeaturesDataset(args.test_path, scenario=args.scenario)
+    train_dataset, val_dataset, test_dataset = get_data(args)
 
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True,
                               num_workers=args.num_workers, persistent_workers=True, 
@@ -71,7 +91,7 @@ def train(args):
         max_epochs=args.n_epochs,
         default_root_dir=args.save_path,
         log_every_n_steps=10,
-        check_val_every_n_epoch= 5)
+        check_val_every_n_epoch= 1)
     trainer.fit(model, train_loader, val_loader)
     
     if args.debug == 'debug':
@@ -85,6 +105,7 @@ if __name__ == '__main__':
     parser.add_argument('--debug', type=str, default=None, help='Debug mode')
     # data params
     parser.add_argument('--data-path', type=str, help='The path to the h5 file')
+    parser.add_argument('--data-type', type=str, choices=['mcvd', 'r3m'])
     parser.add_argument('--test-path', type=str, help='The path to the test file')
     parser.add_argument('--save-path', type=str, help='The path to save the checkpoints')
     parser.add_argument('--scenario', type=str, default='complete')
