@@ -33,30 +33,50 @@ def get_data(args):
     if args.data_type == 'mcvd':
         train_dataset = readout_feats_loader.FeaturesDataset(args.data_path, list(train_set), scenario=args.scenario)
         val_dataset = readout_feats_loader.FeaturesDataset(args.data_path, list(val_set), scenario=args.scenario)
-
-        if args.all_but_one is not None:
-            with open(args.test_scenario_map, 'r') as f:
-                scenarios_indices = json.load(f)
-                test_dataset = readout_feats_loader.FeaturesDataset(args.test_path, 
-                                                                    scenarios_indices[args.all_but_one],
-                                                                    scenario=args.scenario)
-        else:
-            test_dataset = readout_feats_loader.FeaturesDataset(args.test_path, scenario=args.scenario)
     elif args.data_type == 'r3m':
         train_dataset = readout_feats_loader.R3MFeaturesDataset(args.data_path, list(train_set), scenario=args.scenario)
         val_dataset = readout_feats_loader.R3MFeaturesDataset(args.data_path, list(val_set), scenario=args.scenario)
-
-        if args.all_but_one is not None:
-            with open(args.test_scenario_map, 'r') as f:
-                scenarios_indices = json.load(f)
-                test_dataset = readout_feats_loader.R3MFeaturesDataset(args.test_path, 
-                                                                    scenarios_indices[args.all_but_one],
-                                                                    scenario=args.scenario)
-        else:
-            test_dataset = readout_feats_loader.R3MFeaturesDataset(args.test_path, scenario=args.scenario)
         
-    return train_dataset, val_dataset, test_dataset
+    return train_dataset, val_dataset
 
+def test_mcvd(args, trainer, sc):
+    print('########### Evaluate %s scenario:  #################'%sc)
+    if sc is not None:
+        test_dataset = readout_feats_loader.FeaturesDataset(args.test_path, 
+                                                        scenarios_indices[sc],
+                                                        scenario=args.scenario)
+    else:
+        test_dataset = readout_feats_loader.FeaturesDataset(args.test_path, scenario=args.scenario)
+    test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, 
+                num_workers=args.num_workers, persistent_workers=True, 
+                pin_memory=True)
+    trainer.test(dataloaders=test_loader, ckpt_path="best")
+    
+def test_r3m(args, trainer, sc, scenarios_indices):
+    print('########### Evaluate %s scenario:  #################'%sc)
+    if sc is not None:
+        test_dataset = readout_feats_loader.R3MFeaturesDataset(args.test_path, 
+                                                        scenarios_indices[sc],
+                                                        scenario=args.scenario)
+    else:
+        test_dataset = readout_feats_loader.R3MFeaturesDataset(args.test_path, scenario=args.scenario)
+    test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, 
+                num_workers=args.num_workers, persistent_workers=True, 
+                pin_memory=True)
+    trainer.test(dataloaders=test_loader, ckpt_path="best")
+    
+def test_model(trainer, args):
+    with open(args.test_scenario_map, 'r') as f:
+        scenarios_indices = json.load(f)
+        for sc in scenarios_indices.keys():
+            if args.data_type == 'mcvd':
+                test_mcvd(args, trainer, sc, scenarios_indices)
+            elif args.data_type == 'r3m':
+                test_r3m(args, trainer, sc, scenarios_indices)
+        if args.data_type == 'mcvd':
+            test_mcvd(args, trainer, None, scenarios_indices)
+        elif args.data_type == 'r3m':
+            test_r3m(args, trainer, None, scenarios_indices)
 
 def train(args):
     #Get train-test splits
@@ -66,38 +86,36 @@ def train(args):
     
     # Load the data
     print('load_data')
-    train_dataset, val_dataset, test_dataset = get_data(args)
+    train_dataset, val_dataset = get_data(args)
 
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True,
                               num_workers=args.num_workers, persistent_workers=True, 
-                              pin_memory=True)
+                              pin_memory=False)
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, 
                             num_workers=args.num_workers, persistent_workers=True, 
-                            pin_memory=True)
-    test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, 
-                            num_workers=args.num_workers, persistent_workers=True, 
-                            pin_memory=True)
+                            pin_memory=False)
     
     # Load the model
     print('load_model')
     inputs, labels = next(iter(train_loader))
     input_shape = inputs.shape
     model = get_model(args.model_name, input_shape, args.weight_decay, args.lr)
-    
+    print('model_loaded')
+
     trainer = Trainer(
         devices=args.num_gpus,
         accelerator="auto",
         min_epochs=args.n_epochs,
         max_epochs=args.n_epochs,
         default_root_dir=args.save_path,
-        log_every_n_steps=10,
+        log_every_n_steps=1,
         check_val_every_n_epoch= 1)
     trainer.fit(model, train_loader, val_loader)
     
     if args.debug == 'debug':
         trainer.test(dataloaders=train_loader)
 
-    trainer.test(dataloaders=test_loader, ckpt_path="best")
+    test_model(trainer, args)
     
 
 if __name__ == '__main__':

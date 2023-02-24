@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 
+import torchmetrics
+
 from pytorch_lightning import LightningModule, Trainer
 
 from models.readout_models import lr, self_attention_cnn, cnn, attention_mlp, mlp
@@ -24,7 +26,7 @@ class BinaryClassificationWrapper(LightningModule):
         y_hat = self.forward(x)
         loss = F.binary_cross_entropy(y_hat.squeeze(1), y)
         accuracy = torch.mean(((y_hat.squeeze(1) > 0.5).float() == y).float())
-        self.log('train_accuracy', accuracy, on_step=True, prog_bar=True)
+        self.log('train_acc', accuracy, on_step=True, prog_bar=True)
         self.log("train_loss", loss)
         return loss
     
@@ -34,7 +36,7 @@ class BinaryClassificationWrapper(LightningModule):
         y_hat = self.forward(x)
         loss = F.binary_cross_entropy(y_hat.squeeze(1), y)#.unsqueeze(1))
         accuracy = torch.mean(((y_hat.squeeze(1) > 0.5).float() == y).float())
-        self.log('val_accuracy', accuracy, on_step=True, prog_bar=True)
+        self.log('val_acc', accuracy, on_step=True, prog_bar=True)
         self.log("val_loss", loss)
         return loss
         
@@ -44,7 +46,7 @@ class BinaryClassificationWrapper(LightningModule):
         loss = F.binary_cross_entropy(y_hat, y.unsqueeze(1))
         accuracy = torch.mean(((y_hat.squeeze(1) > 0.5).float() == y).float())
         self.log('test_loss', loss, on_step=True)
-        self.log('test_accuracy', accuracy, on_step=True)
+        self.log('test_acc', accuracy, on_step=True)
         return {'test_loss': loss}
     
     def configure_optimizers(self):
@@ -70,8 +72,3 @@ def get_model(model_name, input_size, weight_decay=1e-1, learning_rate=1e-3, sch
         model = self_attention_cnn.CNNWithAttention(input_size)
         
     return BinaryClassificationWrapper(model, weight_decay, learning_rate, scheduler)
-
-
-
-
-    
