@@ -70,10 +70,11 @@ def extract(args):
     print('n features: ',n_features)
         
     # if gamma beta 288, 64, 64 if mid 1152, 8, 8
-    if not args.latent_type == 'middle_embeds':
-        f1, f2, f3 = 288, 2, 2
-    else:
-        f1, f2, f3 = 1152, 1, 1 
+    #if not args.latent_type == 'middle_embeds':
+    #    f1, f2, f3 = 288, 2, 2
+    #else:
+    #    f4 = 1152 
+    f1, f2, f3, f4 = 288, 2, 2, 1152
 
     # Spatin layers are not affected by the sampling so make sampling minimal
     if args.latent_type != 'middle_embeds' and args.readout_type == 'COMPLETE':
@@ -85,19 +86,18 @@ def extract(args):
         dset1 = f.create_dataset("features_beta", (data_size, n_features, f1, f2, f3), dtype='f')
         dset2 = f.create_dataset("label", (data_size,), dtype='f')
         dset3 = f.create_dataset("features_gamma", (data_size, n_features, f1, f2, f3), dtype='f')
-    else:
-        dset1 = f.create_dataset("features", (data_size, n_features, f1, f2, f3), dtype='f')
-        dset2 = f.create_dataset("label", (data_size,), dtype='f')
+        dset4 = f.create_dataset("features_mid", (data_size, n_features, f4, 1, 1), dtype='f')
 
     # extract features
     for i, (test_x, label) in enumerate(test_loader):
         input_frames = data_transform(config, test_x)
-        if not args.latent_type == 'middle_embeds':
-            features_array = {'gamma': np.zeros((test_x.shape[0], n_features, f1, f2, f3)),
-                              'beta': np.zeros((test_x.shape[0], n_features, f1, f2, f3))
+        #if not args.latent_type == 'middle_embeds':
+        features_array = {'gamma': np.zeros((test_x.shape[0], n_features, f1, f2, f3)),
+                          'beta': np.zeros((test_x.shape[0], n_features, f1, f2, f3)),
+                          'mid': np.zeros((test_x.shape[0], n_features, f4, 1, 1)),
                              }
-        else:
-            features_array = np.zeros((test_x.shape[0], n_features, f1, f2, f3))
+        #else:
+        #    features_array = np.zeros((test_x.shape[0], n_features, f1, f2, f3))
         
         real, cond, cond_mask = conditioning_fn(config, input_frames[:, :8, :, :, :], num_frames_pred=config.data.num_frames,
                                             prob_mask_cond=getattr(config.data, 'prob_mask_cond', 0.0),
@@ -107,14 +107,13 @@ def extract(args):
         t = time.time()
         pred, gamma, beta, mid = sampler(init, scorenet, cond=cond, cond_mask=cond_mask, subsample=args.sub, verbose=True)
         print('one processing: ', time.time() - t)
-        if args.latent_type == 'middle_embeds':
-            mid = nn.AdaptiveAvgPool3d((None, 1, 1))(mid.cpu())
-            features_array[:, 0, :, :, :] =  mid.numpy()
-        else:
-            gamma = nn.AdaptiveAvgPool3d((None, 2, 2))(gamma.cpu())
-            beta = nn.AdaptiveAvgPool3d((None, 2, 2))(beta.cpu())
-            features_array['gamma'][:, 0, :, :, :] =  gamma.numpy()
-            features_array['beta'][:, 0, :, :, :] =  beta.numpy()
+        #if args.latent_type == 'middle_embeds':
+        mid = nn.AdaptiveAvgPool3d((None, 1, 1))(mid.cpu())
+        features_array['mid'][:, 0, :, :, :] =  mid.numpy()
+        gamma = nn.AdaptiveAvgPool3d((None, 2, 2))(gamma.cpu())
+        beta = nn.AdaptiveAvgPool3d((None, 2, 2))(beta.cpu())
+        features_array['gamma'][:, 0, :, :, :] =  gamma.numpy()
+        features_array['beta'][:, 0, :, :, :] =  beta.numpy()
             
         for j in range(1, n_features):
             if args.readout_type == 'SIMULATION':
@@ -135,33 +134,26 @@ def extract(args):
                 cond = pred
             init = init_samples(len(real), config)
             pred, gamma, beta, mid = sampler(init, scorenet, cond=cond, cond_mask=cond_mask, subsample=args.sub, verbose=True)
-            if args.latent_type == 'middle_embeds':
-                mid = nn.AdaptiveAvgPool3d((None, 1, 1))(mid.cpu())
-                features_array[:, j, :, :, :] =  mid.numpy()
-            else:
-                gamma = nn.AdaptiveAvgPool3d((None, 2, 2))(gamma.cpu())
-                beta = nn.AdaptiveAvgPool3d((None, 2, 2))(beta.cpu())
-                features_array['gamma'][:, j, :, :, :] =  gamma.numpy()
-                features_array['beta'][:, j, :, :, :] =  beta.numpy()
+            #if args.latent_type == 'middle_embeds':
+            mid = nn.AdaptiveAvgPool3d((None, 1, 1))(mid.cpu())
+            features_array['mid'][:, j, :, :, :] =  mid.numpy()
+            #else:
+            gamma = nn.AdaptiveAvgPool3d((None, 2, 2))(gamma.cpu())
+            beta = nn.AdaptiveAvgPool3d((None, 2, 2))(beta.cpu())
+            features_array['gamma'][:, j, :, :, :] =  gamma.numpy()
+            features_array['beta'][:, j, :, :, :] =  beta.numpy()
             
         print('whole processing: ', time.time() - t)
-        if args.latent_type == 'middle_embeds':   
-            if pred.shape[0] == args.batch_size:
-                dset1[i * args.batch_size: (i+1)*args.batch_size, :, :, :, :] = features_array
-                dset2[i * args.batch_size: (i+1)*args.batch_size] = label
-
-            else:
-                dset1[i * args.batch_size:, :, :, :, :] = features_array
-                dset2[i * args.batch_size:] = label
+        if pred.shape[0] == args.batch_size:
+            dset1[i * args.batch_size: (i+1)*args.batch_size, :, :, :, :] = features_array['beta']
+            dset2[i * args.batch_size: (i+1)*args.batch_size] = label
+            dset3[i * args.batch_size: (i+1)*args.batch_size, :, :, :, :] = features_array['gamma']
+            dset4[i * args.batch_size: (i+1)*args.batch_size, :, :, :, :] = features_array['mid']
         else:
-            if pred.shape[0] == args.batch_size:
-                dset1[i * args.batch_size: (i+1)*args.batch_size, :, :, :, :] = features_array['beta']
-                dset2[i * args.batch_size: (i+1)*args.batch_size] = label
-                dset3[i * args.batch_size: (i+1)*args.batch_size, :, :, :, :] = features_array['gamma']
-            else:
-                dset1[i * args.batch_size:, :, :, :, :] = features_array['beta']
-                dset2[i * args.batch_size:] = label
-                dset3[i * args.batch_size:, :, :, :, :] = features_array['gamma']
+            dset1[i * args.batch_size:, :, :, :, :] = features_array['beta']
+            dset2[i * args.batch_size:] = label
+            dset3[i * args.batch_size:, :, :, :, :] = features_array['gamma']
+            dset4[i * args.batch_size:, :, :, :, :] = features_array['mid']
         
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
