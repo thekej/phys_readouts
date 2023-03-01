@@ -48,7 +48,13 @@ def train(args):
             indices = list(set(indices) - set(banned_scenario))
             print('Removing %d datapoints from the %s scenario'%(len(banned_scenario),
                                                                  args.all_but_one))
-    X = load_hdf5(args.data_path, args.scenario, indices)
+    if args.data_type == 'mcvd':
+        scenario_feature = 'features'
+    else:
+        scenario_feature = args.scenario
+    X = load_hdf5(args.data_path, scenario_feature, indices)
+    if args.scenario_name in ['observed_gamma', 'observed_beta']:
+        X = X[:, 0]
     X = X.reshape(X.shape[0], -1)
     y = load_hdf5(args.data_path, 'label', indices)
     print(X.shape)
@@ -57,10 +63,10 @@ def train(args):
     # Define the hyperparameter grid to search
     print('Load model')
     if args.model_type == 'logistic':
-        param_grid = {'clf__C': np.logspace(-5, 5, 11), 'clf__penalty': ['l2']}
-        model = LogisticRegression(max_iter=10000)
+        param_grid = {'clf__C': np.logspace(-3, 3, 7), 'clf__penalty': ['l2']}
+        model = LogisticRegression(max_iter=20000)
     elif args.model_type == 'svc':
-        param_grid = {'clf__C': np.logspace(-5, 5, 11), 'clf__loss': ['hinge']}
+        param_grid = {'clf__C': np.logspace(-3, 0, 4), 'clf__loss': ['hinge']}
         model = LinearSVC(max_iter=10000)
 
     # Create the pipeline with a logistic regression model and a scaler
@@ -84,10 +90,12 @@ def train(args):
     result['train'] = accuracy
     
     #
-    test_data = load_hdf5(args.test_path, args.scenario)
+    test_data = load_hdf5(args.test_path, scenario_feature)
+    if args.scenario_name in ['observed_gamma', 'observed_beta']:
+        test_data = test_data[:, 0]
     test_label = load_hdf5(args.test_path, 'label')
     result = test_model(grid_search, test_data, test_label, args, result)
-    with open(args.data_type+'_'+ args.model_type + '_' +args.scenario+'_exclude_'+str(args.all_but_one)+'_results.json', 'w') as f:
+    with open(args.data_type+'_'+ args.model_type + '_' +args.scenario_name+'_exclude_'+str(args.all_but_one)+'_results.json', 'w') as f:
         json.dump(result, f)
 
     # Save the best model for later use
@@ -116,6 +124,7 @@ def main():
     parser.add_argument('--data-type', type=str, help='The path to the h5 file')
     parser.add_argument('--test-path', type=str, help='The path to the test file')
     parser.add_argument('--scenario', type=str, default='features')
+    parser.add_argument('--scenario-name', type=str, default='features')    
     parser.add_argument('--all-but-one', type=str, default=None,
                         choices=['collision', 'domino', 'link', 'towers', 
                                  'contain', 'drop', 'roll'],
