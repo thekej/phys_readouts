@@ -65,8 +65,8 @@ def process_video(video_file, video_length, return_length_only=False):
 
 def main(args):
     # set up new dataset
-    videos = glob.glob(os.path.join(args.data_dir, "**/**/*.hdf5"))
-    corrupt = glob.glob(os.path.join(args.data_dir, '**/**/temp.hdf5'))
+    videos = glob.glob(os.path.join(args.data_dir, "**/*.hdf5"))
+    corrupt = glob.glob(os.path.join(args.data_dir, '**/temp.hdf5'))
     videos = list(set(videos) - set(corrupt))
     vid_len = 250
     
@@ -120,8 +120,6 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-co', '--vqgan-config', type=str, default=None,
-                        help='Path for model config')
     parser.add_argument('-ckpt', '--vqgan-checkpoint', type=str, default=None,
                         help='Path for model checkpoint')
     parser.add_argument('-id', '--data-dir', type=str,
