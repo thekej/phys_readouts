@@ -1,9 +1,17 @@
 import json
 import argparse
 import torch
+import h5py
 
 import readout_feats_loader
 
+def load_hdf5(file_path, dataset_name, indices=None):
+    with h5py.File(file_path, 'r') as file:
+        if indices is None:
+            dataset = file[dataset_name][...]
+        else:
+            dataset = file[dataset_name][sorted(indices)]
+    return dataset
 
 def map_(args):
     with open(args.map_path, 'r') as f:
@@ -14,14 +22,8 @@ def map_(args):
                  'roll': []}
 
     for s in scenarios.keys():
-        if args.data_type == 'r3m':
-            train_dataset = readout_feats_loader.R3MFeaturesDataset(args.data_path, 
-                                                         scenarios[s])
-        else:
-            train_dataset = readout_feats_loader.FeaturesDataset(args.data_path, 
-                                                         scenarios[s])
         
-        labels = train_dataset.labels[:][scenarios[s]]
+        labels = load_hdf5(args.data_path, 'label', scenarios[s])
         class_counts = torch.bincount(torch.tensor(labels).int())
         min_class = min(class_counts).item()
         print(class_counts)
@@ -31,7 +33,8 @@ def map_(args):
         count = [0,0]
         for idx, i in enumerate(labels):
             if count[int(i)] < min_class:
-                indices += [scenarios[s][idx]]
+                
+                indices += [sorted(scenarios[s])[idx]]
                 count[int(i)] += 1
         print('For class %s, we have %d negative and %d positive'%(s, count[0], count[1]))
         scenarios_balanced[s] = indices
