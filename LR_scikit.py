@@ -53,8 +53,12 @@ def train(args):
     else:
         scenario_feature = args.scenario
     X = load_hdf5(args.data_path, scenario_feature, indices)
-    if args.scenario_name in ['observed_gamma', 'observed_beta', 'observed']:
+    if args.scenario_name in ['observed_gamma', 'observed_beta']:
         X = X[:, 0]
+    elif args.scenario_name == 'observed_teco':
+        print(X.shape)
+        X = X[:, :7]
+        print(X.shape)
     X = X.reshape(X.shape[0], -1)
     y = load_hdf5(args.data_path, 'label', indices)
     print(X.shape)
@@ -63,7 +67,7 @@ def train(args):
     # Define the hyperparameter grid to search
     print('Load model')
     if args.model_type == 'logistic':
-        param_grid = {'clf__C': np.logspace(-3, 1, 5), 'clf__penalty': ['l2']}
+        param_grid = {'clf__C': np.logspace(-7, -1, 7), 'clf__penalty': ['l2']}
         model = LogisticRegression(max_iter=20000)
     elif args.model_type == 'svc':
         param_grid = {'clf__C': np.logspace(-3, 0, 4), 'clf__loss': ['hinge']}
@@ -91,8 +95,10 @@ def train(args):
     
     #
     test_data = load_hdf5(args.test_path, scenario_feature)
-    if args.scenario_name in ['observed_gamma', 'observed_beta', 'observed']:
+    if args.scenario_name in ['observed_gamma', 'observed_beta']:
         test_data = test_data[:, 0]
+    elif args.scenario_name == 'observed_teco':
+        test_data = test_data[:, :7]
     test_label = load_hdf5(args.test_path, 'label')
     result = test_model(grid_search, test_data, test_label, args, result)
     with open(args.data_type+'_'+ args.model_type + '_' +args.scenario_name+'_exclude_'+str(args.all_but_one)+'_results.json', 'w') as f:
