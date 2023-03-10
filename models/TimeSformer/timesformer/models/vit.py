@@ -349,3 +349,7 @@ class TimeSformer(nn.Module):
     def forward(self, x):
         x = self.model(x)
         return x
+    
+    def forward_features(self, x):
+        x = self.model.forward_features(x)
+        return x
