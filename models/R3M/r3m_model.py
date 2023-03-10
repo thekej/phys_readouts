@@ -34,6 +34,15 @@ def load_model(
 
     return model
 
+class ID(nn.Module):
+    def __init__(self, latent_dim):
+        super().__init__()
+        self.latent_dim = latent_dim
+
+    def forward(self, x):
+        assert isinstance(x, list)
+        return x[-1]  # just return last embedding
+
 class R3M_pretrained(nn.Module):
     def __init__(self):
         super().__init__()
@@ -62,7 +71,7 @@ class LSTM(nn.Module):
 
 # Given sequence of images, predicts next latent
 class FrozenPretrainedEncoder(nn.Module):
-    def __init__(self, encoder, dynamics, n_past=7, full_rollout=True):
+    def __init__(self, encoder, dynamics, n_past=7, full_rollout=False):
         super().__init__()
 
         self.full_rollout = full_rollout
@@ -158,7 +167,9 @@ def _get_encoder(encoder):
 
 
 def _get_dynamics(dynamics):
-    if dynamics == "lstm":
+    if dynamics == "id":
+        return ID
+    elif dynamics == "lstm":
         return LSTM
     else:
         raise NotImplementedError(dynamics)
@@ -166,4 +177,9 @@ def _get_dynamics(dynamics):
 def pfR3M_LSTM_physion(n_past=7, **kwargs):
     return FrozenPretrainedEncoder(
         encoder="r3m", dynamics="lstm", n_past=n_past, **kwargs
+    )
+
+def pfR3M_ID(n_past=7, **kwargs):
+    return FrozenPretrainedEncoder(
+        encoder="r3m", dynamics="id", n_past=n_past, **kwargs
     )
