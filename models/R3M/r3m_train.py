@@ -106,5 +106,20 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     train(args)
+    
+    
+'''
+# from line 74 to 83 in r3m/r3m/__init__.py
+#rep = torch.nn.DataParallel(rep)
+r3m_state_dict = remove_language_head(torch.load(modelpath, map_location=torch.device(device))['r3m'])
+new_sd = OrderedDict()
+for k, v in r3m_state_dict.items():
+    if k.startswith("module."):
+        name = k[7:]  # remove 'module.' of dataparallel/DDP
+    else:
+        name = k
+    new_sd[name] = v
+rep.load_state_dict(new_sd)
+'''
                        
                     
