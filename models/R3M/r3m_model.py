@@ -119,12 +119,10 @@ class FrozenPretrainedEncoder(nn.Module):
         simulated_states = torch.stack(simulated_states, axis=1)
         assert observed_states.shape == simulated_states.shape
 
-        loss = nn.MSELoss()(simulated_states, observed_states)
         output = {
             "input_states": input_states,
             "observed_states": observed_states,
             "simulated_states": simulated_states,
-            "loss": loss,
         }
         if self.full_rollout:
             output["states"] = torch.cat([input_states, simulated_states], axis=1)
