@@ -15,10 +15,8 @@ def load_model(
     model, model_path, state_dict_key="state_dict"
 ):
     params = torch.load(model_path, map_location="cpu")
-    assert (
-        state_dict_key in params.keys()
-    ), f"{state_dict_key} not in params dictionary."
-    sd = params[state_dict_key]
+    
+    sd = params
     new_sd = OrderedDict()
     for k, v in sd.items():
         if k.startswith("module."):
@@ -29,7 +27,7 @@ def load_model(
     model.load_state_dict(new_sd)
     print(f"Loaded parameters from {model_path}")
 
-    # Set model to eval mode
+    # Set model to eval mode'''
     model.eval()
 
     return model

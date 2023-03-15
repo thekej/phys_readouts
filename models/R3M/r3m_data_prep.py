@@ -44,7 +44,7 @@ def main(args):
     # set up new dataset
     videos = glob.glob(os.path.join(args.data_dir, "**/**/*.hdf5"))
     corrupt = glob.glob(os.path.join(args.data_dir, '**/**/temp.hdf5'))
-    videos = list(set(videos) - set(corrupt))[:100]
+    videos = list(set(videos) - set(corrupt))
     print('Number of videos: ',len(videos)) 
     vid_len = 25
     data_transform = transforms.Compose(R3M_VAL_TRANSFORMS)
