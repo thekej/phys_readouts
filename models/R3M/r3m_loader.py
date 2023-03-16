@@ -74,8 +74,8 @@ class Ego4D(torch.utils.data.Dataset):
             try:
                 decord_vr = decord.VideoReader(video_name, num_threads=1)
             except:
-                print(f"Error loading video {video_name}")
-                return None
+                return(self.__getitem__(index+1))
+
             duration = len(decord_vr)
 
         segment_indices, skip_offsets, new_step, skip_length = self._sample_train_indices(duration)

@@ -20,8 +20,8 @@ def validate_model(training_logs, model, batch_idx, total_batches,
     val_loss = 0
     with torch.no_grad():
         for c, data in enumerate(val_loader):
-            #if c > 10 and not full:
-            #    break
+            if c > 100 and not full:
+                break
             # Send data and target to device
             data = data.to(device)
             # Forward pass
@@ -98,8 +98,8 @@ def train(args):
                             use_decord=True)
 
         # Create data loaders
-        train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-        val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
+        train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=96)
+        val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=96)
         print('Data Loaded')
 
     
