@@ -26,7 +26,7 @@ def validate_model(training_logs, model, batch_idx, total_batches,
             data = data.to(device)
             # Forward pass
             output = model(data)
-            step_loss = output['loss']
+            step_loss = output['loss'].mean()
             # Calculate loss
             val_loss += step_loss.item()
             # Print results for this epoch
@@ -127,7 +127,7 @@ def train(args):
             # Calculate loss
             #simulated_states = output['simulated_states']
             #observed_states = output['observed_states']
-            loss = output['loss']#nn.MSELoss()(simulated_states, observed_states)
+            loss = output['loss'].mean()#nn.MSELoss()(simulated_states, observed_states)
             
             # Backward pass
             loss.backward()
@@ -136,19 +136,19 @@ def train(args):
             optimizer.step()
 
             if (batch_idx + 1) % args.log_step == 0:
-                if args.data_type == 'physion':
-                    validate_model(training_logs, model, batch_idx, len(train_loader), 
-                                   val_loader, device, epoch, args, loss, full=False)
-                    model.train()
-                else:
-                    log_sentence = 'Epoch [{}/{}], Step [{}/{}], Loss: {}'.format(epoch+1, args.num_epochs, 
-                                                                                  batch_idx, len(train_loader), 
-                                                                                  loss.item())
-                    print(log_sentence)
-                    training_logs += [log_sentence+'\n']
+                #if args.data_type == 'physion':
+                #    validate_model(training_logs, model, batch_idx, len(train_loader), 
+                #                   val_loader, device, epoch, args, loss, full=False)
+                #    model.train()
+                #else:
+                log_sentence = 'Epoch [{}/{}], Step [{}/{}], Loss: {}'.format(epoch+1, args.num_epochs, 
+                                                                              batch_idx, len(train_loader), 
+                                                                              loss.item())
+                print(log_sentence)
+                training_logs += [log_sentence+'\n']
 
-                    with open(args.log_files, 'w') as f:                    
-                        f.writelines(training_logs)
+                with open(args.log_files, 'w') as f:                    
+                    f.writelines(training_logs)
             if (batch_idx + 1) % args.save_step == 0:
                 torch.save(model.state_dict(), args.save_path + 'checkpoint_%d_%d.pt'%(epoch, batch_idx))
 
