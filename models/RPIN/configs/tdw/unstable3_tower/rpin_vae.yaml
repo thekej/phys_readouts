@@ -1,0 +1,48 @@
+OUTPUT_DIR: ./outputs/tdw
+DATA_ROOT: ['/mnt/fs4/mrowca/neurips/images/rigid/unstable3_tower']
+SOLVER:
+  BASE_LR: 4.0e-4  # single GPU LR
+  WEIGHT_DECAY: 0.0
+  SCHEDULER: 'cosine'
+  MAX_ITERS: 1000000
+  VAL_INTERVAL: 10000
+  BATCH_SIZE: 32 # single GPU Batch Size
+INPUT:
+  IMAGE_MEAN: [172.43259665, 170.03378874, 164.74700896]
+  IMAGE_STD: [40.74215148, 41.68665817, 43.92719399]
+  TRAIN_NUM: 63360
+  TRAIN_SLICE: [0, 1024, 1]
+  VAL_NUM: 384
+  VAL_SLICE: [2, 1024, 32]
+  PRELOAD_TO_MEMORY: False
+RPIN:
+  BACKBONE: 'hourglass_bn'
+  ARCH: 'rpin_vae'
+  VE_FEAT_DIM: 256
+  IN_FEAT_DIM: 256
+  # prediction setting:
+  INPUT_SIZE: 1
+  CONS_SIZE: 1
+  PRED_SIZE_TRAIN: 15
+  PRED_SIZE_TEST: 26
+  # input setting:
+  INPUT_HEIGHT: 256
+  INPUT_WIDTH: 256
+  NUM_OBJS: 3
+  # data augmentation
+  HORIZONTAL_FLIP: True
+  VERTICAL_FLIP: False
+  # loss weight
+  OFFSET_LOSS_WEIGHT: 0.01
+  POSITION_LOSS_WEIGHT: 1.0
+  # ----- image feature
+  IMAGE_UP: False
+  ROI_POOL_SIZE: 3
+  # ----- coordinate feature
+  COOR_FEATURE: True
+  COOR_FEATURE_EMBEDDING: True
+  # ----- conditional computation
+  IN_CONDITION: True
+  # ----- vae setting
+  VAE: True
+  VAE_KL_LOSS_WEIGHT: 3e-5

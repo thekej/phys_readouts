@@ -1,0 +1,49 @@
+OUTPUT_DIR: ./outputs/tdw
+DATA_ROOT: ['/mnt/fs4/fanyun/human_stimulis/slide_roll/']
+SOLVER:
+  BASE_LR: 4.0e-4  # single GPU LR
+  WEIGHT_DECAY: 1.0e-6
+  SCHEDULER: 'cosine'
+  MAX_ITERS: 2000000
+  VAL_INTERVAL: 10000
+  BATCH_SIZE: 20 # single GPU Batch Size
+INPUT:
+  IMAGE_MEAN: [175.09227538, 172.6902074, 167.32537665]
+  IMAGE_STD: [36.5023262, 37.57936052, 40.3491209]
+  TRAIN_NUM: 74572
+  TRAIN_SLICE: [32, 1024, 1] #[0, 1024, 1]
+  VAL_NUM: 320
+  VAL_SLICE: [32, 1024, 64]
+  BINARY_LABELS: ['is_rolling']
+  PRELOAD_TO_MEMORY: False
+RPIN:
+  BACKBONE: 'hourglass'
+  ARCH: 'rpin'
+  VE_FEAT_DIM: 256
+  IN_FEAT_DIM: 256
+  # prediction setting:
+  INPUT_SIZE: 10
+  CONS_SIZE: 1
+  PRED_SIZE_TRAIN: 5
+  PRED_SIZE_TEST: 5
+  # input setting:
+  INPUT_HEIGHT: 256
+  INPUT_WIDTH: 256
+  NUM_OBJS: 1
+  # data augmentation
+  HORIZONTAL_FLIP: True
+  VERTICAL_FLIP: True
+  # loss weight
+  OFFSET_LOSS_WEIGHT: 100.0
+  POSITION_LOSS_WEIGHT: 1.0
+  # ----- image feature
+  # IMAGE_UP: False
+  # ROI_POOL_SIZE: 3
+  # ----- coordinate feature
+  COOR_FEATURE: True
+  COOR_FEATURE_EMBEDDING: True
+  # ----- conditional computation
+  IN_CONDITION: True
+  # ----- vae setting
+  # VAE: True
+  # VAE_KL_LOSS_WEIGHT: 3e-5

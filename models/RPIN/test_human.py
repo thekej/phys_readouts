@@ -6,10 +6,10 @@ import argparse
 import numpy as np
 from torch.utils.data import DataLoader
 #from neuralphys.datasets.pyp import PyPhys
-from neuralphys.datasets.tdw import TDWPhys as PyPhys
+from neuralphys.datasets.tdw_human import TDWPhys as PyPhys
 from neuralphys.utils.config import _C as C
 from neuralphys.models import *
-from neuralphys.evaluator_pred import PredEvaluator
+from neuralphys.evaluator_feat import PredEvaluator
 
 
 def arg_parse():
