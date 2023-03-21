@@ -17,7 +17,8 @@ def arg_parse():
     # only the most general argument is passed here
     # task-specific parameters should be passed by config file
     parser = argparse.ArgumentParser(description='RPIN parameters')
-    parser.add_argument('--cfg', required=True, help='path to config file', type=str)
+    parser.add_argument('--output-dir', required=True, help='path to config file', type=str)
+    parser.add_argument('--data-size', type=int, default=0)
     parser.add_argument('--init', type=str, default='')
     parser.add_argument('--gpus', type=str)
     parser.add_argument('--output', type=str)
@@ -49,20 +50,18 @@ def main():
         assert NotImplementedError
 
     # ---- setup config files
-    cfg.merge_from_file(args.cfg)
+    #cfg.merge_from_file(args.cfg)
     cfg.SOLVER.BATCH_SIZE *= num_gpus
     cfg.SOLVER.BASE_LR *= num_gpus
     cfg.freeze()
-    output_dir = os.path.join(cfg.OUTPUT_DIR, cfg.DATA_ROOT[0].split('/')[1], args.output)
-    os.makedirs(output_dir, exist_ok=True)
-    shutil.copy(args.cfg, os.path.join(output_dir, 'config.yaml'))
-    shutil.copy(os.path.join('neuralphys/models/', cfg.RPIN.ARCH + '.py'), os.path.join(output_dir, 'arch.py'))
+    os.makedirs(args.output_dir, exist_ok=True)
+    shutil.copy(args.cfg, os.path.join(args.output_dir, 'config.yaml'))
 
     # ---- setup logger
-    logger = setup_logger('RPIN', output_dir)
-    print(git_diff_config(args.cfg))
+    logger = setup_logger('RPIN', args.output_dir)
+    #print(git_diff_config(args.cfg))
 
-    model = eval(cfg.RPIN.ARCH + '.Net')()
+    model = Net()
     model.to(torch.device('cuda'))
     model = torch.nn.DataParallel(
         model, device_ids=list(range(args.gpus.count(',') + 1))
@@ -87,8 +86,12 @@ def main():
     random.seed(rng_seed)
     np.random.seed(rng_seed)
     torch.manual_seed(rng_seed)
-    train_set = PyPhys(data_root=cfg.DATA_ROOT, split='train')
-    val_set = PyPhys(data_root=cfg.DATA_ROOT, split='test')
+    
+    indices = list(range(args.data_size))
+    train_indices = random.sample(indices, int(0.9 * len(indices)))
+    val_indices = list(set(indices) - set(train_indices))
+    train_set = RPINDataset(args.data_path, train_indices)
+    val_set = RPINDataset(args.data_path, val_indices)
     kwargs = {'pin_memory': True, 'num_workers': 0} #16
     train_loader = torch.utils.data.DataLoader(
         train_set, batch_size=cfg.SOLVER.BATCH_SIZE, shuffle=True, **kwargs,
@@ -104,7 +107,7 @@ def main():
               'optim': optim,
               'train_loader': train_loader,
               'val_loader': val_loader,
-              'output_dir': output_dir,
+              'output_dir': args.output_dir,
               'logger': logger,
               'num_gpus': num_gpus,
               'max_iters': cfg.SOLVER.MAX_ITERS}
@@ -113,8 +116,8 @@ def main():
     try:
         trainer.train()
     except BaseException:
-        if len(glob(f"{output_dir}/*.tar")) < 1:
-            shutil.rmtree(output_dir)
+        if len(glob(f"{args.output_dir}/*.tar")) < 1:
+            shutil.rmtree(args.output_dir)
         raise
 
 

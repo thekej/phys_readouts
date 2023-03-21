@@ -39,18 +39,18 @@ _C.SOLVER.SCHEDULER = 'step'
 # Region Proposal Interaction Network
 # ---------------------------------------------------------------------------- #
 _C.RPIN = CN()
-_C.RPIN.ARCH = ''
-_C.RPIN.BACKBONE = ''
+_C.RPIN.ARCH = 'rpin'
+_C.RPIN.BACKBONE = 'hourglass'
 _C.RPIN.HORIZONTAL_FLIP = True
 _C.RPIN.VERTICAL_FLIP = True
 # prediction setting
-_C.RPIN.INPUT_SIZE = 4
+_C.RPIN.INPUT_SIZE = 7
 _C.RPIN.CONS_SIZE = 1
-_C.RPIN.PRED_SIZE_TRAIN = 20
-_C.RPIN.PRED_SIZE_TEST = 40
+_C.RPIN.PRED_SIZE_TRAIN = 18
+_C.RPIN.PRED_SIZE_TEST = 18
 # input for mixed dataset
-_C.RPIN.INPUT_HEIGHT = 360
-_C.RPIN.INPUT_WIDTH = 640
+_C.RPIN.INPUT_HEIGHT = 256
+_C.RPIN.INPUT_WIDTH = 256
 # training setting
 _C.RPIN.NUM_OBJS = 3
 _C.RPIN.OFFSET_LOSS_WEIGHT = 1.0
