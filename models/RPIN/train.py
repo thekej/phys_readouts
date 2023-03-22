@@ -6,10 +6,12 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 plt.switch_backend('agg')
-from neuralphys.datasets.tdw import TDWPhys as PyPhys
+
+from physion_loader import RPINDataset
 from neuralphys.utils.config import _C as cfg
 from neuralphys.utils.logger import setup_logger, git_diff_config
 from neuralphys.models import *
+from neuralphys.models.rpin import Net
 from neuralphys.trainer import Trainer
 
 
@@ -18,10 +20,10 @@ def arg_parse():
     # task-specific parameters should be passed by config file
     parser = argparse.ArgumentParser(description='RPIN parameters')
     parser.add_argument('--output-dir', required=True, help='path to config file', type=str)
+    parser.add_argument('--data-path', required=True, help='path for data', type=str)
     parser.add_argument('--data-size', type=int, default=0)
     parser.add_argument('--init', type=str, default='')
     parser.add_argument('--gpus', type=str)
-    parser.add_argument('--output', type=str)
     parser.add_argument('--seed', type=int, default=0)
     return parser.parse_args()
 
@@ -55,7 +57,7 @@ def main():
     cfg.SOLVER.BASE_LR *= num_gpus
     cfg.freeze()
     os.makedirs(args.output_dir, exist_ok=True)
-    shutil.copy(args.cfg, os.path.join(args.output_dir, 'config.yaml'))
+    #shutil.copy(args.cfg, os.path.join(args.output_dir, 'config.yaml'))
 
     # ---- setup logger
     logger = setup_logger('RPIN', args.output_dir)
@@ -92,7 +94,7 @@ def main():
     val_indices = list(set(indices) - set(train_indices))
     train_set = RPINDataset(args.data_path, train_indices)
     val_set = RPINDataset(args.data_path, val_indices)
-    kwargs = {'pin_memory': True, 'num_workers': 0} #16
+    kwargs = {'pin_memory': False, 'num_workers': 96} #16
     train_loader = torch.utils.data.DataLoader(
         train_set, batch_size=cfg.SOLVER.BATCH_SIZE, shuffle=True, **kwargs,
     )

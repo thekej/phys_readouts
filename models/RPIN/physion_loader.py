@@ -14,7 +14,7 @@ pil_logger = logging.getLogger('PIL')
 pil_logger.setLevel(logging.ERROR)    
 
 def get_colors(f):
-    id_img = np.array(f['frames']['0000']['images']['_id'][()]) # first frame, assumes all objects are in view
+    id_img = np.array(f['frames']['0000']['images']['_id_cam0'][()]) # first frame, assumes all objects are in view
     id_img = np.array(Image.open(io.BytesIO(id_img))) # (256, 256, 3)
     colors = np.unique(id_img.reshape(-1, id_img.shape[2]), axis=0) # full list of unique colors in id map
     return colors
@@ -67,12 +67,12 @@ class RPINDataset(Dataset):
         data_root,
         indices=None,
         seq_len=25,
-        state_len=25,
+        state_len=7,
         subsample_factor=6,
         seed=0,
         ):
-        videos = glob.glob(os.path.join(args.data_dir, "**/**/*.hdf5"))
-        corrupt = glob.glob(os.path.join(args.data_dir, '**/**/temp.hdf5'))
+        videos = glob.glob(os.path.join(data_root, "**/**/*.hdf5"))
+        corrupt = glob.glob(os.path.join(data_root, '**/**/temp.hdf5'))
         self.hdf5_files = list(set(videos) - set(corrupt))
         self.indices = indices
         self.seq_len = seq_len
@@ -105,8 +105,6 @@ class RPINDataset(Dataset):
                     target_contacted_zone = True
                     break
 
-            assert len(frames)//self.subsample_factor >= self.seq_len, 'Images must be at least len {}, but are {}'.format(self.seq_len, len(frames)//self.subsample_factor)
-
             images = []
             img_transforms = transforms.Compose([
                 #transforms.Resize((self.imsize, self.imsize)),
@@ -116,7 +114,7 @@ class RPINDataset(Dataset):
             # object_ids = np.array(f['static']['object_ids'])
             prev_bboxes = 0
             for frame in frames[0:self.seq_len*self.subsample_factor:self.subsample_factor]:
-                img = f['frames'][frame]['images']['_img'][()]
+                img = f['frames'][frame]['images']['_img_cam0'][()]
                 if img.ndim == 1:
                     img = Image.open(io.BytesIO(img)) # (256, 256, 3)
                 else:
@@ -126,15 +124,18 @@ class RPINDataset(Dataset):
                 if 'bboxes' in f['frames'][frame]:
                     bboxes = f['frames'][frame]['bboxes'][()]
                 else:
-                    id_img = f['frames'][frame]['images']['_id'][()]
+                    id_img = f['frames'][frame]['images']['_id_cam0'][()]
                     id_img = np.array(Image.open(io.BytesIO(id_img))) # (256, 256, 3)
                     bboxes = compute_bboxes_from_mask(id_img, colors)
                 bboxes, prev_bboxes = np.where(bboxes==-1, prev_bboxes, bboxes), bboxes
                 rois.append(bboxes)
+            if len(rois) < self.seq_len:
+                images += [images[-1]] * (self.seq_len - len(rois))
+                rois += [rois[-1]] * (self.seq_len - len(rois))
 
             rois = np.array(rois, dtype=np.float32)
             num_objs = rois.shape[1]
-            max_objs = 10 # self.pretraining_cfg.MODEL.RPIN.NUM_OBJS # TODO: do padding elsewhere?
+            max_objs = 15 # self.pretraining_cfg.MODEL.RPIN.NUM_OBJS # TODO: do padding elsewhere?
             assert num_objs <= max_objs, f'num objs {num_objs} greater than max objs {max_objs}'
             ignore_mask = np.ones(max_objs, dtype=np.float32)
             if num_objs < max_objs:
@@ -146,7 +147,7 @@ class RPINDataset(Dataset):
             binary_labels = torch.ones((self.seq_len, 1)) if target_contacted_zone else torch.zeros((self.seq_len, 1)) # Get single label over whole sequence
             stimulus_name = f['static']['stimulus_name'][()]
 
-        sample = {
+        '''sample = {
             'data': images[:self.state_len],
             'rois': rois,
             'labels': labels, # [off, pos]
@@ -155,5 +156,5 @@ class RPINDataset(Dataset):
             'stimulus_name': stimulus_name,
             'binary_labels': binary_labels,
             'images': images,
-        }
-        return sample
+        }'''
+        return images[:self.state_len], rois, labels, images[:self.state_len], torch.from_numpy(ignore_mask), stimulus_name, binary_labels, images

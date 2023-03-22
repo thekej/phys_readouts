@@ -98,16 +98,15 @@ class Net(nn.Module):
         bbox_rollout = bbox_rollout.reshape(-1, num_rollouts, self.num_objs, self.decoder_output)
 
         encoded_states = torch.cat([x, src_coor_features[:, :x.shape[1]]], axis=-1)
-        encoded_before_relu_states = torch.cat([x_before_relu,
-            src_coor_features[:, :x.shape[1]]], axis=-1)
         all_states = torch.stack(all_states, axis=1)
         all_coors = torch.stack(all_coors, axis=1)
         rollout_states = torch.cat([all_states, all_coors], axis=-1)
+        
+        print(encoded_states.shape, all_states.shape, rollout_states.shape)
 
         outputs = {
             'bbox': bbox_rollout,
             'encoded_states': encoded_states,
-            'encoded_before_relu_states': encoded_before_relu_states,
             'rollout_states': rollout_states,
             'r_ignore_idx': torch.cat([r, ignore_idx], axis=-1)
         }
