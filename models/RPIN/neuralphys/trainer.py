@@ -71,8 +71,6 @@ class Trainer(object):
 
             data = data.to(self.device)
             labels = labels.to(self.device)
-            print(data.shape)
-            print(boxes.shape)
             rois, coor_features = self._init_rois(boxes, data.shape)
             self.optim.zero_grad()
             outputs = self.model(data, rois, coor_features, num_rollouts=self.ptrain_size + self.cons_size,

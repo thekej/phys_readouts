@@ -67,7 +67,7 @@ class RPINDataset(Dataset):
         data_root,
         indices=None,
         seq_len=25,
-        state_len=7,
+        state_len=4,
         subsample_factor=6,
         seed=0,
         ):

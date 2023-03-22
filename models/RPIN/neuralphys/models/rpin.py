@@ -102,8 +102,6 @@ class Net(nn.Module):
         all_coors = torch.stack(all_coors, axis=1)
         rollout_states = torch.cat([all_states, all_coors], axis=-1)
         
-        print(encoded_states.shape, all_states.shape, rollout_states.shape)
-
         outputs = {
             'bbox': bbox_rollout,
             'encoded_states': encoded_states,
