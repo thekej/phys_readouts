@@ -66,7 +66,7 @@ class Trainer(object):
             self.epochs += 1
 
     def train_epoch(self):
-        for batch_idx, (data, boxes, labels, data_last, ignore_idx) in enumerate(self.train_loader):
+        for batch_idx, (data, boxes, labels, data_last, ignore_idx, _, _, _) in enumerate(self.train_loader):
             self._adjust_learning_rate()
 
             data = data.to(self.device)
@@ -254,6 +254,7 @@ class Trainer(object):
         load_list = np.cumsum(load_list)
         for i in range(1, self.num_gpus):
             batch_rois[load_list[i - 1]:load_list[i]] -= (load_list[i - 1] * time_step)
+        
         rois = torch.cat([batch_rois, rois], dim=-1)
         return rois, coor_features
 
