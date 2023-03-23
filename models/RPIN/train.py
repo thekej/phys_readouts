@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 plt.switch_backend('agg')
 
-from physion_loader import RPINDataset
+from physion_loader import RPINTrainDataset
 from neuralphys.utils.config import _C as cfg
 from neuralphys.utils.logger import setup_logger, git_diff_config
 from neuralphys.models import *
@@ -92,8 +92,8 @@ def main():
     indices = list(range(args.data_size))
     train_indices = random.sample(indices, int(0.9 * len(indices)))
     val_indices = list(set(indices) - set(train_indices))
-    train_set = RPINDataset(args.data_path, train_indices)
-    val_set = RPINDataset(args.data_path, val_indices)
+    train_set = RPINTrainDataset(args.data_path, train_indices)
+    val_set = RPINTrainDataset(args.data_path, val_indices)
     kwargs = {'pin_memory': False, 'num_workers': 96} #16
     train_loader = torch.utils.data.DataLoader(
         train_set, batch_size=cfg.SOLVER.BATCH_SIZE, shuffle=True, **kwargs,
