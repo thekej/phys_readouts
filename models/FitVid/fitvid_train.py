@@ -67,15 +67,15 @@ def train(args):
         print('Data Loaded')
     else:
 
-        with open(os.path.expanduser(os.path.join(args.data_path, 'kinetics_400_train_list.txt')),'r') as f:
+        with open( '/ccn2/u/thekej/ego4d/kinetics_400_train_list.txt', 'r') as f:
             all_training_videos = f.readlines()
         all_training_videos = [_.strip().split(' ')[0] for _ in all_training_videos]
 
-        with open(os.path.expanduser(os.path.join(args.data_path, 'kinetics_400_val_list.txt')),'r') as f:
+        with open('/ccn2/u/thekej/ego4d/kinetics_400_val_list.txt', 'r') as f:
             all_validation_videos = f.readlines()
         all_validation_videos = [_.strip().split(' ')[0] for _ in all_validation_videos]
 
-        with open(os.path.expanduser(os.path.join(args.data_path, 'ego4d_train_list_320p_chunked.txt')),'r') as f:
+        with open('/ccn2/u/thekej/ego4d/ego4d_train_list_320p_chunked.txt', 'r') as f:
             ego4d_videos = f.readlines()
         ego4d_videos = [_.strip().split(' ')[0] for _ in ego4d_videos]
         
