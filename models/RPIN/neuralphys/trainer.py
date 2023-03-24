@@ -21,7 +21,7 @@ class Trainer(object):
         self.model = model
         self.optim = optim
         # input setting
-        self.input_size, self.cons_size = C.RPIN.INPUT_SIZE, C.RPIN.CONS_SIZE
+        self.input_size = C.RPIN.INPUT_SIZE
         self.ptrain_size, self.ptest_size = C.RPIN.PRED_SIZE_TRAIN, C.RPIN.PRED_SIZE_TEST
         self.input_height, self.input_width = C.RPIN.INPUT_HEIGHT, C.RPIN.INPUT_WIDTH
         self.batch_size = C.SOLVER.BATCH_SIZE
@@ -73,7 +73,7 @@ class Trainer(object):
             labels = labels.to(self.device)
             rois, coor_features = self._init_rois(boxes, data.shape)
             self.optim.zero_grad()
-            outputs = self.model(data, rois, coor_features, num_rollouts=self.ptrain_size + self.cons_size,
+            outputs = self.model(data, rois, coor_features, num_rollouts=self.ptrain_size,
                                  data_pred=data_last, phase='train', ignore_idx=ignore_idx)
             loss = self.loss(outputs, labels, 'train', ignore_idx)
             loss.backward()
@@ -85,7 +85,7 @@ class Trainer(object):
             print_msg += f"{self.epochs:03}/{self.iterations // 1000:04}k"
             print_msg += f" | "
             mean_loss = np.mean(np.array(
-                self.pos_step_losses[self.cons_size - 1:self.cons_size + self.ptrain_size]
+                self.pos_step_losses[: 1 + self.ptrain_size]
             ) / self.loss_cnt) * 1e3
 
             if mean_loss > 1e4:
@@ -120,7 +120,7 @@ class Trainer(object):
         self._init_loss()
         if C.RPIN.VAE:
             all_losses = dict.fromkeys(self.loss_name, 0.0)
-            all_step_losses = [0.0 for _ in range(self.ptest_size + self.cons_size)]
+            all_step_losses = [0.0 for _ in range(self.ptest_size)]
 
         for batch_idx, (data, boxes, labels, _, ignore_idx) in enumerate(self.val_loader):
             tprint(f'eval: {batch_idx}/{len(self.val_loader)}')
@@ -131,10 +131,10 @@ class Trainer(object):
 
                 if C.RPIN.VAE:
                     min_losses = dict.fromkeys(self.loss_name, 0.0)
-                    min_step_losses = [0.0 for _ in range(self.ptest_size + self.cons_size)]
+                    min_step_losses = [0.0 for _ in range(self.ptest_size)]
                     iter_best_mean = 1e6
                     for i in range(10):
-                        outputs = self.model(data, rois, coor_features, num_rollouts=self.ptest_size + self.cons_size,
+                        outputs = self.model(data, rois, coor_features, num_rollouts=self.ptest_size,
                                              phase='val', ignore_idx=ignore_idx)
                         self.loss(outputs, labels, 'val', ignore_idx)
                         if np.mean(np.array(self.pos_step_losses) / self.loss_cnt) * 1e3 < iter_best_mean:
@@ -147,7 +147,7 @@ class Trainer(object):
                     for i in range(len(all_step_losses)):
                         all_step_losses[i] += min_step_losses[i]
                 else:
-                    outputs = self.model(data, rois, coor_features, num_rollouts=self.ptest_size + self.cons_size,
+                    outputs = self.model(data, rois, coor_features, num_rollouts=self.ptest_size,
                                          phase='val', ignore_idx=ignore_idx)
                     self.loss(outputs, labels, 'val', ignore_idx)
 
@@ -165,10 +165,10 @@ class Trainer(object):
         print_msg += f" | "
 
         mean_loss = np.mean(np.array(
-            self.pos_step_losses[self.cons_size - 1:self.cons_size + self.ptest_size]
+            self.pos_step_losses[:1 + self.ptest_size]
         ) / self.loss_cnt) * 1e3
 
-        if np.mean(np.array(self.pos_step_losses[self.cons_size - 1:]) / self.loss_cnt) * 1e3 < self.best_mean:
+        if np.mean(np.array(self.pos_step_losses) / self.loss_cnt) * 1e3 < self.best_mean:
             self.snapshot('ckpt_best.path.tar')
             self.best_mean = mean_loss
 
@@ -179,7 +179,7 @@ class Trainer(object):
 
     def loss(self, outputs, labels, phase='train', ignore_idx=None):
         self.loss_cnt += labels.shape[0]
-        valid_length = self.cons_size + self.ptrain_size if phase == 'train' else self.cons_size + self.ptest_size
+        valid_length = self.ptrain_size if phase == 'train' else self.ptest_size
 
         bbox_rollouts = outputs['bbox']
         # of shape (batch, time, #obj, 4)
@@ -190,31 +190,7 @@ class Trainer(object):
         loss = loss.sum(2) / ignore_idx.sum(2)
         loss[..., 0:2] = loss[..., 0:2] * self.offset_loss_weight
         loss[..., 2:4] = loss[..., 2:4] * self.position_loss_weight
-        o_loss = loss[..., 0:2]  # offset
-        p_loss = loss[..., 2:4]  # position
-
-        for i in range(valid_length):
-            self.pos_step_losses[i] += p_loss[:, i].sum(0).sum(-1).mean().item()
-            self.off_step_losses[i] += o_loss[:, i].sum(0).sum(-1).mean().item()
-
-        p1_loss = self.pos_step_losses[self.cons_size - 1:self.cons_size + self.ptrain_size]
-        p2_loss = self.pos_step_losses[self.cons_size + self.ptrain_size:]
-        self.losses['p_1'] = np.mean(p1_loss)
-        self.losses['p_2'] = np.mean(p2_loss)
-
-        o1_loss = self.off_step_losses[self.cons_size - 1:self.cons_size + self.ptrain_size]
-        o2_loss = self.off_step_losses[self.cons_size + self.ptrain_size:]
-        self.losses['o_1'] = np.mean(o1_loss)
-        self.losses['o_2'] = np.mean(o2_loss)
-
-        # no need to do precise batch statistics, just do mean for backward gradient
-        loss = loss.mean(0)
-        pred_length = loss[self.cons_size:].shape[0]
-        init_tau = C.RPIN.DISCOUNT_TAU ** (1 / self.ptrain_size)
-        tau = init_tau + (self.iterations / self.max_iters) * (1 - init_tau)
-        tau = torch.pow(tau, torch.arange(pred_length, out=torch.FloatTensor()))[:, None]
-        tau = torch.cat([torch.ones(self.cons_size, 1), tau], dim=0).to('cuda')
-        loss = ((loss * tau) / tau.sum(axis=0, keepdims=True)).sum()
+        loss = loss.mean(0).sum()
 
         if C.RPIN.VAE and phase == 'train':
             kl_loss = outputs['kl_loss']
@@ -269,11 +245,25 @@ class Trainer(object):
 
     def _init_loss(self):
         self.losses = dict.fromkeys(self.loss_name, 0.0)
-        self.pos_step_losses = [0.0 for _ in range(self.ptest_size + self.cons_size)]
-        self.off_step_losses = [0.0 for _ in range(self.ptest_size + self.cons_size)]
+        self.pos_step_losses = [0.0 for _ in range(self.ptest_size)]
+        self.off_step_losses = [0.0 for _ in range(self.ptest_size)]
         # an statistics of each validation
         self.loss_cnt = 0
         self.time = timer()
+        
+    def _init_loss(self):
+        cfg = self.pretraining_cfg.MODEL.RPIN
+        self.loss_name = []
+        self.offset_loss_weight = cfg.OFFSET_LOSS_WEIGHT
+        self.position_loss_weight = cfg.POSITION_LOSS_WEIGHT
+        self.loss_name += ['p_1', 'p_2', 'o_1', 'o_2']
+        if cfg.VAE:
+            self.loss_name += ['k_l']
+        self.ptrain_size = cfg.PRED_SIZE_TRAIN
+        self.ptest_size = cfg.PRED_SIZE_TEST
+        self.losses = dict.fromkeys(self.loss_name, 0.0)
+        self.pos_step_losses = [0.0 for _ in range(self.ptest_size)]
+        self.off_step_losses = [0.0 for _ in range(self.ptest_size)]
 
     def _adjust_learning_rate(self):
         if self.iterations <= C.SOLVER.WARMUP_ITERS:
