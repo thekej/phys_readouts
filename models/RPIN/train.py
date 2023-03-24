@@ -91,6 +91,7 @@ def main():
     
     indices = list(range(args.data_size))
     train_indices = random.sample(indices, int(0.9 * len(indices)))
+    print(len(train_indices))
     val_indices = list(set(indices) - set(train_indices))
     train_set = RPINTrainDataset(args.data_path, train_indices)
     val_set = RPINTrainDataset(args.data_path, val_indices)
