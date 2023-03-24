@@ -177,4 +177,4 @@ class RPINTrainDataset(Dataset):
         labels = self.dataset["labels"][index]
         data_last = self.dataset["data_last"][index]
         ignore_mask = self.dataset["ignore_mask"][index]
-        return data, boxes, labels, data_last, ignore_idx
+        return data, boxes, labels, data_last, ignore_mask

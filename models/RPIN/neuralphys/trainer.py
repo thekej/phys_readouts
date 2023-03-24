@@ -252,15 +252,14 @@ class Trainer(object):
         self.time = timer()
         
     def _init_loss(self):
-        cfg = self.pretraining_cfg.MODEL.RPIN
         self.loss_name = []
-        self.offset_loss_weight = cfg.OFFSET_LOSS_WEIGHT
-        self.position_loss_weight = cfg.POSITION_LOSS_WEIGHT
+        self.offset_loss_weight = C.RPIN.OFFSET_LOSS_WEIGHT
+        self.position_loss_weight = C.RPIN.POSITION_LOSS_WEIGHT
         self.loss_name += ['p_1', 'p_2', 'o_1', 'o_2']
-        if cfg.VAE:
+        if C.RPIN.VAE:
             self.loss_name += ['k_l']
-        self.ptrain_size = cfg.PRED_SIZE_TRAIN
-        self.ptest_size = cfg.PRED_SIZE_TEST
+        self.ptrain_size = C.RPIN.PRED_SIZE_TRAIN
+        self.ptest_size = C.RPIN.PRED_SIZE_TEST
         self.losses = dict.fromkeys(self.loss_name, 0.0)
         self.pos_step_losses = [0.0 for _ in range(self.ptest_size)]
         self.off_step_losses = [0.0 for _ in range(self.ptest_size)]

@@ -26,10 +26,10 @@ def main(args):
     
     f = h5py.File(args.save_path, "w")
     dset1 = f.create_dataset("data", (len(dataset), 7, 3, 256, 256), dtype='f')
-    dset2 = f.create_dataset("rois", (len(dataset), 25, 15, 4), dtype='i')
-    dset3 = f.create_dataset("labels", (len(dataset), 18, 15, 4), dtype='i')
-    dset4 = f.create_dataset("data_last", (len(dataset), 7, 3, 256, 256), dtype='i')
-    dset6 = f.create_dataset("ignore_mask", (len(dataset), 15), dtype='i')    
+    dset2 = f.create_dataset("rois", (len(dataset), 25, 15, 4), dtype='f')
+    dset3 = f.create_dataset("labels", (len(dataset), 18, 15, 4), dtype='f')
+    dset4 = f.create_dataset("data_last", (len(dataset), 7, 3, 256, 256), dtype='f')
+    dset6 = f.create_dataset("ignore_mask", (len(dataset), 15), dtype='f')    
 
     stimulus_map = {}
     length = []
@@ -38,7 +38,7 @@ def main(args):
         data, rois, labels, data_last, ignore_mask, stimulus_name, \
         binary_labels = batch['data'], batch['rois'], batch['labels'], batch['data_last'], batch['ignore_mask'], \
                         batch['stimulus_name'][0], batch['binary_labels']
-            
+        
         dset1[i] = data
         dset2[i] = rois
         dset3[i] = labels
