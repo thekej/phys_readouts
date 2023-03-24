@@ -66,7 +66,7 @@ class Trainer(object):
             self.epochs += 1
 
     def train_epoch(self):
-        for batch_idx, (data, boxes, labels, data_last, ignore_idx, _, _, _) in enumerate(self.train_loader):
+        for batch_idx, (data, boxes, labels, data_last, ignore_idx) in enumerate(self.train_loader):
             self._adjust_learning_rate()
 
             data = data.to(self.device)

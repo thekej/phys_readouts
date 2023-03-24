@@ -67,7 +67,7 @@ class RPINDataset(Dataset):
         data_root,
         indices=None,
         seq_len=25,
-        state_len=4,
+        state_len=7,
         subsample_factor=6,
         seed=0,
         ):
@@ -107,7 +107,7 @@ class RPINDataset(Dataset):
 
             images = []
             img_transforms = transforms.Compose([
-                #transforms.Resize((self.imsize, self.imsize)),
+                transforms.Resize((256, 256)),
                 transforms.ToTensor(),
                 ])
             rois = []
@@ -147,7 +147,7 @@ class RPINDataset(Dataset):
             binary_labels = torch.ones((self.seq_len, 1)) if target_contacted_zone else torch.zeros((self.seq_len, 1)) # Get single label over whole sequence
             stimulus_name = f['static']['stimulus_name'][()]
 
-        '''sample = {
+        sample = {
             'data': images[:self.state_len],
             'rois': rois,
             'labels': labels, # [off, pos]
@@ -156,5 +156,25 @@ class RPINDataset(Dataset):
             'stimulus_name': stimulus_name,
             'binary_labels': binary_labels,
             'images': images,
-        }'''
-        return images[:self.state_len], rois, labels, images[:self.state_len], torch.from_numpy(ignore_mask), stimulus_name, binary_labels, images
+        }
+        return sample
+    
+class RPINTrainDataset(Dataset):
+    def __init__(self, data_path, indices = None):
+        self.dataset = h5py.File(data_path, 'r')  
+        self.indices = indices
+
+    def __len__(self):
+        if self.indices is not None:
+            return len(self.indices)
+        return self.dataset['data'].shape[0]   
+
+    def __getitem__(self, index):
+        if self.indices is not None:
+            index = self.indices[index]
+        data = self.dataset["data"][index]
+        boxes = self.dataset["rois"][index]
+        labels = self.dataset["labels"][index]
+        data_last = self.dataset["data_last"][index]
+        ignore_mask = self.dataset["ignore_mask"][index]
+        return data, boxes, labels, data_last, ignore_idx
