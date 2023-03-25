@@ -25,14 +25,14 @@ _C.INPUT.BINARY_LABELS = []
 # ---------------------------------------------------------------------------- #
 _C.SOLVER = CN()
 
-_C.SOLVER.BASE_LR = 0.001
+_C.SOLVER.BASE_LR = 0.00001
 _C.SOLVER.LR_GAMMA = 0.1
 _C.SOLVER.VAL_INTERVAL = 16000
 _C.SOLVER.WEIGHT_DECAY = 0.0005
 _C.SOLVER.WARMUP_ITERS = -1
 _C.SOLVER.LR_MILESTONES = [12000000, 18000000]
 _C.SOLVER.MAX_ITERS = 20000000
-_C.SOLVER.BATCH_SIZE = 128
+_C.SOLVER.BATCH_SIZE = 32
 _C.SOLVER.SCHEDULER = 'step'
 
 # ---------------------------------------------------------------------------- #

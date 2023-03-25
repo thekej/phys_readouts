@@ -2,7 +2,6 @@ import os
 import torch
 import numpy as np
 from neuralphys.utils.misc import tprint
-from timeit import default_timer as timer
 from neuralphys.utils.config import _C as C
 import time
 
@@ -30,98 +29,55 @@ class Trainer(object):
         self.epochs = 0
         self.max_iters = max_iters
         self.val_interval = C.SOLVER.VAL_INTERVAL
-        # loss settings
-        self._setup_loss()
-        self.best_mean = 1e6
+        self.offset_loss_weight = C.RPIN.OFFSET_LOSS_WEIGHT
+        self.position_loss_weight = C.RPIN.POSITION_LOSS_WEIGHT
         # train start time
-        self.start_time = time.time()
         # maximum model run time in seconds (86400 sec = 1 day)
         self.max_run_time = max_run_time
 
-
-    def seconds_to_time(self, seconds_time):
-        hours = seconds_time // 3600
-        minutes = (seconds_time - (hours * 3600)) // 60
-        seconds = seconds_time - (minutes * 60)
-        return hours, minutes, seconds
-
-
-    def exceeded_time(self):
-        run_time = time.time() - self.start_time
-        if run_time > self.max_run_time:
-            print("Maximum run time (%d h %d m %d s) exceeded after %d h %d m %d s" % \
-                    (*self.seconds_to_time(self.max_run_time), 
-                        *self.seconds_to_time(run_time))) 
-            return True
-        else:
-            return False
-
     def train(self):
-        print_msg = "| ".join(["progress  | mean "] + list(map("{:6}".format, self.loss_name)))
         self.model.train()
-        print('\r', end='')
-        self.logger.info(print_msg)
-        while self.iterations < self.max_iters and not self.exceeded_time():
+        self.logger.info('Start training.')
+        while self.iterations < self.max_iters:
             self.train_epoch()
             self.epochs += 1
+        self.logger.info('Training done.')
 
     def train_epoch(self):
         for batch_idx, (data, boxes, labels, data_last, ignore_idx) in enumerate(self.train_loader):
             self._adjust_learning_rate()
-
             data = data.to(self.device)
             labels = labels.to(self.device)
             rois, coor_features = self._init_rois(boxes, data.shape)
             self.optim.zero_grad()
+
             outputs = self.model(data, rois, coor_features, num_rollouts=self.ptrain_size,
                                  data_pred=data_last, phase='train', ignore_idx=ignore_idx)
+
             loss = self.loss(outputs, labels, 'train', ignore_idx)
+
             loss.backward()
             self.optim.step()
 
             self.iterations += self.batch_size
 
-            print_msg = ""
-            print_msg += f"{self.epochs:03}/{self.iterations // 1000:04}k"
-            print_msg += f" | "
-            mean_loss = np.mean(np.array(
-                self.pos_step_losses[: 1 + self.ptrain_size]
-            ) / self.loss_cnt) * 1e3
+            log_sentence = 'Epoch [{}], Step[{}/{}], Train Loss: {}'.format(self.epochs, self.iterations, self.max_iters, loss.item())
 
-            if mean_loss > 1e4:
-                raise ValueError('Loss exploded: %f' % mean_loss)
-
-            print_msg += f"{mean_loss:.3f} | "
-            print_msg += f" | ".join(
-                ["{:.3f}".format(self.losses[name] * 1e3 / self.loss_cnt) for name in self.loss_name])
-            speed = self.loss_cnt / (timer() - self.time)
-            eta = (self.max_iters - self.iterations) / speed / 3600
-            print_msg += f" | speed: {speed:.1f} | eta: {eta:.2f} h"
-            print_msg += (" " * (os.get_terminal_size().columns - len(print_msg) - 10))
-            tprint(print_msg)
-
-            if self.iterations % self.val_interval == 0:
+            #tprint(log_sentence)
+            self.logger.info(log_sentence)
+            
+            if self.iterations >= self.max_iters:
                 self.snapshot()
                 self.val()
-                self._init_loss()
-                self.model.train()
-                if self.exceeded_time():
-                    print('\r', end='')
-                    print(f'best mean: {self.best_mean:.3f}')
-                    break
-
-            if self.iterations >= self.max_iters:
-                print('\r', end='')
-                print(f'best mean: {self.best_mean:.3f}')
                 break
+                
+        self.snapshot('ckpt_epoch_%s.path.tar'%self.epochs)
+        self.val()
+        self.model.train()
 
     def val(self):
         self.model.eval()
-        self._init_loss()
-        if C.RPIN.VAE:
-            all_losses = dict.fromkeys(self.loss_name, 0.0)
-            all_step_losses = [0.0 for _ in range(self.ptest_size)]
-
+        val_loss = 0
         for batch_idx, (data, boxes, labels, _, ignore_idx) in enumerate(self.val_loader):
             tprint(f'eval: {batch_idx}/{len(self.val_loader)}')
             with torch.no_grad():
@@ -129,56 +85,14 @@ class Trainer(object):
                 labels = labels.to(self.device)
                 rois, coor_features = self._init_rois(boxes, data.shape)
 
-                if C.RPIN.VAE:
-                    min_losses = dict.fromkeys(self.loss_name, 0.0)
-                    min_step_losses = [0.0 for _ in range(self.ptest_size)]
-                    iter_best_mean = 1e6
-                    for i in range(10):
-                        outputs = self.model(data, rois, coor_features, num_rollouts=self.ptest_size,
-                                             phase='val', ignore_idx=ignore_idx)
-                        self.loss(outputs, labels, 'val', ignore_idx)
-                        if np.mean(np.array(self.pos_step_losses) / self.loss_cnt) * 1e3 < iter_best_mean:
-                            min_losses = self.losses.copy()
-                            min_step_losses = self.pos_step_losses.copy()
-                            iter_best_mean = np.mean(np.array(self.pos_step_losses)) * 1e3
-                        self._init_loss()
-                    for k, v in all_losses.items():
-                        all_losses[k] += min_losses[k]
-                    for i in range(len(all_step_losses)):
-                        all_step_losses[i] += min_step_losses[i]
-                else:
-                    outputs = self.model(data, rois, coor_features, num_rollouts=self.ptest_size,
+                outputs = self.model(data, rois, coor_features, num_rollouts=self.ptest_size,
                                          phase='val', ignore_idx=ignore_idx)
-                    self.loss(outputs, labels, 'val', ignore_idx)
-
-        if C.RPIN.VAE:
-            self.losses = all_losses.copy()
-            self.pos_step_losses = all_step_losses.copy()
-            self.loss_cnt = len(self.val_loader)
-
-        for name in self.loss_name:
-            self.losses[name] = self.losses[name] / self.loss_cnt
-
-        print('\r', end='')
-        print_msg = ""
-        print_msg += f"{self.epochs:03}/{self.iterations // 1000:04}k"
-        print_msg += f" | "
-
-        mean_loss = np.mean(np.array(
-            self.pos_step_losses[:1 + self.ptest_size]
-        ) / self.loss_cnt) * 1e3
-
-        if np.mean(np.array(self.pos_step_losses) / self.loss_cnt) * 1e3 < self.best_mean:
-            self.snapshot('ckpt_best.path.tar')
-            self.best_mean = mean_loss
-
-        print_msg += f"{mean_loss:.3f} | "
-        print_msg += f" | ".join(["{:.3f}".format(self.losses[name] * 1e3) for name in self.loss_name])
-        print_msg += (" " * (os.get_terminal_size().columns - len(print_msg) - 10))
-        self.logger.info(print_msg)
+                loss = self.loss(outputs, labels, 'val', ignore_idx)
+                val_loss += loss.item()
+        log_sentence = 'Epoch [{}] is done, Val Loss: {}'.format(self.epochs, val_loss/len(self.val_loader))
+        self.logger.info(log_sentence)
 
     def loss(self, outputs, labels, phase='train', ignore_idx=None):
-        self.loss_cnt += labels.shape[0]
         valid_length = self.ptrain_size if phase == 'train' else self.ptest_size
 
         bbox_rollouts = outputs['bbox']
@@ -194,7 +108,6 @@ class Trainer(object):
 
         if C.RPIN.VAE and phase == 'train':
             kl_loss = outputs['kl_loss']
-            self.losses['k_l'] += kl_loss.sum().item()
             loss += C.RPIN.VAE_KL_LOSS_WEIGHT * kl_loss.sum()
 
         return loss
@@ -233,36 +146,6 @@ class Trainer(object):
         
         rois = torch.cat([batch_rois, rois], dim=-1)
         return rois, coor_features
-
-    def _setup_loss(self):
-        self.loss_name = []
-        self.offset_loss_weight = C.RPIN.OFFSET_LOSS_WEIGHT
-        self.position_loss_weight = C.RPIN.POSITION_LOSS_WEIGHT
-        self.loss_name += ['p_1', 'p_2', 'o_1', 'o_2']
-        if C.RPIN.VAE:
-            self.loss_name += ['k_l']
-        self._init_loss()
-
-    def _init_loss(self):
-        self.losses = dict.fromkeys(self.loss_name, 0.0)
-        self.pos_step_losses = [0.0 for _ in range(self.ptest_size)]
-        self.off_step_losses = [0.0 for _ in range(self.ptest_size)]
-        # an statistics of each validation
-        self.loss_cnt = 0
-        self.time = timer()
-        
-    def _init_loss(self):
-        self.loss_name = []
-        self.offset_loss_weight = C.RPIN.OFFSET_LOSS_WEIGHT
-        self.position_loss_weight = C.RPIN.POSITION_LOSS_WEIGHT
-        self.loss_name += ['p_1', 'p_2', 'o_1', 'o_2']
-        if C.RPIN.VAE:
-            self.loss_name += ['k_l']
-        self.ptrain_size = C.RPIN.PRED_SIZE_TRAIN
-        self.ptest_size = C.RPIN.PRED_SIZE_TEST
-        self.losses = dict.fromkeys(self.loss_name, 0.0)
-        self.pos_step_losses = [0.0 for _ in range(self.ptest_size)]
-        self.off_step_losses = [0.0 for _ in range(self.ptest_size)]
 
     def _adjust_learning_rate(self):
         if self.iterations <= C.SOLVER.WARMUP_ITERS:

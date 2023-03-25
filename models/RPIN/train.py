@@ -61,14 +61,12 @@ def main():
 
     # ---- setup logger
     logger = setup_logger('RPIN', args.output_dir)
-    #print(git_diff_config(args.cfg))
 
     model = Net()
     model.to(torch.device('cuda'))
     model = torch.nn.DataParallel(
         model, device_ids=list(range(args.gpus.count(',') + 1))
     )
-
     # ---- setup optimizer, optimizer is not changed
     vae_params = [p for p_name, p in model.named_parameters() if 'vae_lstm' in p_name]
     other_params = [p for p_name, p in model.named_parameters() if 'vae_lstm' not in p_name]
@@ -102,7 +100,7 @@ def main():
     val_loader = torch.utils.data.DataLoader(
         val_set, batch_size=1 if cfg.RPIN.VAE else cfg.SOLVER.BATCH_SIZE, shuffle=False, **kwargs,
     )
-    print(f'size: train {len(train_loader)} / test {len(val_loader)}')
+    print(f'size: train {len(train_indices)} / test {len(val_indices)}')
 
     # ---- setup trainer
     kwargs = {'device': torch.device('cuda'),
