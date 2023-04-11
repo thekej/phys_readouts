@@ -25,7 +25,7 @@
 #         out_dir: directory for dumping model, log, and visualization
 
 
-training_data_dir: '/apdcephfs/share_1364275/jiaqihan/AIPhysics/Physion/training_data_dir'
-testing_data_dir: '/apdcephfs/share_1364275/jiaqihan/AIPhysics/Physion/testing_data_dir'
-dpi_data_dir: '/apdcephfs/share_1364275/jiaqihan/AIPhysics/Physion/dpi_data_dir'
-out_dir: '/apdcephfs/share_1364275/jiaqihan/AIPhysics/Physion/out_dir'
+training_data_dir: '/ccn2/u/rmvenkat/data/testing_physion/gen_full_data_depth_512/lf_0'
+testing_data_dir: '/ccn2/u/rmvenkat/data/testing_physion/gen_full_data_depth_512/lf_0'
+dpi_data_dir: '/ccn2/u/thekej/sgnn/'
+out_dir: '/ccn2/u/thekej/sgnn/out_dir/'

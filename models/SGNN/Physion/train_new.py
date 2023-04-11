@@ -59,7 +59,7 @@ parser.add_argument('--model_name', default='DPINet2')
 parser.add_argument('--floor_cheat', type=int, default=0)
 parser.add_argument('--env', default='')
 parser.add_argument('--train_valid_ratio', type=float, default=0.9)
-parser.add_argument('--outf', default='files')
+parser.add_argument('--outf', default='/ccn2/u/thekej/sgnn/exps/')
 parser.add_argument('--dataf', default='data')
 parser.add_argument('--statf', default="")
 parser.add_argument('--noise_std', type=float, default='0')
@@ -152,19 +152,20 @@ else:
     raise AssertionError("Unsupported env")
 
 writer = SummaryWriter(os.path.join(args.outf, "log"))
-data_root = os.path.join(data_root, "train")
+#data_root = os.path.join(data_root, "train")
 args.data_root = data_root
-if "," in args.dataf:
+#if "," in args.dataf:
     # list of folder
-    args.dataf = [os.path.join(data_root, tmp.strip()) for tmp in args.dataf.split(",") if tmp != ""]
+#    args.dataf = [os.path.join(data_root, tmp.strip()) for tmp in args.dataf.split(",") if tmp != ""]
 
-else:
-    args.dataf = args.dataf.strip()
-    if "/" in args.dataf:
-        args.dataf = 'data/' + args.dataf
-    else:  # only prefix
-        args.dataf = 'data/' + args.dataf + '_' + args.env
-    os.system('mkdir -p ' + args.dataf)
+#else:
+#    args.dataf = args.dataf.strip()
+#    if "/" in args.dataf:
+#        args.dataf = 'data/' + args.dataf
+#    else:  # only prefix
+#        args.dataf = 'data/' + args.dataf + '_' + args.env
+#    os.system('mkdir -p ' + args.dataf)
+args.dataf = glob.glob(os.path.join(args.data_root, "**/"))#[os.path.join(data_root,'collide_all_movies/')
 os.system('mkdir -p ' + args.outf)
 
 logger = get_logger(args.outf)

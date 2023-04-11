@@ -3,6 +3,7 @@ import torch
 import time
 import random
 import numpy as np
+import glob
 import gzip
 import pickle
 import h5py
@@ -755,7 +756,6 @@ class PhysicsFleXDataset(Dataset):
         self.augment_coord = self.args.augment_worldcoord
 
         assert(isinstance(self.args.dataf, list))
-        self.data_dir = [os.path.join(dataf, phase) for dataf in self.args.dataf]
         if self.args.statf:
             self.stat_path = os.path.join(self.args.data_root, self.args.statf)
         else:
@@ -768,17 +768,12 @@ class PhysicsFleXDataset(Dataset):
         self.training_fpt = self.args.training_fpt
         self.dt = self.training_fpt * self.args.dt
         self.start_timestep = int(15 * self.training_fpt)
+        
+        self.all_trials = glob.glob(os.path.join(args.data_root, "**/**/**"))
 
         if self.args.n_rollout == None:
-            self.all_trials = []
-            self.n_rollout = 0
-            for ddir in self.data_dir:
-                file = open(ddir + ".txt", "r")
-                ddir_root = "/".join(ddir.split("/")[:-1])
-                trial_names = [line.strip("\n") for line in file if line != "\n"]
-                n_trials = len(trial_names)
-                self.all_trials += [os.path.join(ddir_root, trial_name) for trial_name in trial_names]
-                self.n_rollout += n_trials
+            #self.all_trials += [os.path.join(ddir_root, trial_name) for trial_name in trial_names]
+            self.n_rollout = len(self.all_trials)
 
             if phase == "train":
                 self.mean_time_step = int(13499/self.n_rollout) + 1
@@ -892,7 +887,8 @@ class PhysicsFleXDataset(Dataset):
             idx_timestep = np.random.randint(self.start_timestep, time_step)
         else:
             raise ValueError
-
+#/ccn2/u/thekej/sgnn/roll_all_movies/pilot_it2_rollingSliding_simple_collision_box/0000/
+#/ccn2/u/thekej/sgnn/roll_all_movies/pilot_it2_rollingSliding_simple_collision_box/
         data_path = os.path.join(data_dir, trial_fullname, str(idx_timestep) + '.h5')
         data_nxt_path = os.path.join(data_dir, trial_fullname, str(int(idx_timestep + self.training_fpt)) + '.h5')
         current_oldest = 0
