@@ -2,6 +2,7 @@ import os
 import sys
 import random
 import logging
+import glob
 import time
 import argparse
 import numpy as np
@@ -43,6 +44,7 @@ out_root = get_query_dir("out_dir")
 parser = argparse.ArgumentParser()
 parser.add_argument('--pstep', type=int, default=2)
 parser.add_argument('--n_rollout', type=int, default=0)
+parser.add_argument('--data_size', type=int, default=14834)
 parser.add_argument('--time_step', type=int, default=0)
 parser.add_argument('--time_step_clip', type=int, default=0)
 parser.add_argument('--dt', type=float, default=1./60.)
@@ -165,14 +167,20 @@ args.data_root = data_root
 #    else:  # only prefix
 #        args.dataf = 'data/' + args.dataf + '_' + args.env
 #    os.system('mkdir -p ' + args.dataf)
-args.dataf = glob.glob(os.path.join(args.data_root, "**/"))#[os.path.join(data_root,'collide_all_movies/')
+
+args.dataf = glob.glob(os.path.join(args.data_root, "**/"))
 os.system('mkdir -p ' + args.outf)
 
 logger = get_logger(args.outf)
 logger.info('Fix seed ' + str(args.seed))
 # generate data
+indices = range(args.data_size)
+train_indices = random.sample(list(indices), int(args.data_size * args.train_valid_ratio))
+valid_indices = list(set(indices) - set(train_indices))
+indices = {'train': train_indices,
+           'valid': valid_indices}
 datasets = {phase: PhysicsFleXDataset(
-    args, phase, phases_dict, args.verbose_data) for phase in ['train', 'valid']}
+    args, phase, phases_dict, args.verbose_data, indices[phase]) for phase in ['train', 'valid']}
 
 for phase in ['train', 'valid']:
     datasets[phase].load_data(args.env)
@@ -363,4 +371,5 @@ for epoch in range(st_epoch, args.n_epoch):
                 print('Best valid loss {:.6f}, Best valid epoch {:4d}'.format(best_valid_loss, best_valid_epoch))
                 logger.info('Best valid loss {:.6f}, Best valid epoch {:4d}'.format(best_valid_loss, best_valid_epoch))
                 exit(0)
+
 

@@ -748,12 +748,13 @@ def prepare_input(data, stat, args, phases_dict, verbose=0, var=False):
 
 class PhysicsFleXDataset(Dataset):
 
-    def __init__(self, args, phase, phases_dict, verbose):
+    def __init__(self, args, phase, phases_dict, verbose, indices=None):
         self.args = args
         self.phase = phase
         self.phases_dict = phases_dict
         self.verbose = verbose
         self.augment_coord = self.args.augment_worldcoord
+        self.indices = indices
 
         assert(isinstance(self.args.dataf, list))
         if self.args.statf:
@@ -767,17 +768,19 @@ class PhysicsFleXDataset(Dataset):
             raise ValueError
         self.training_fpt = self.args.training_fpt
         self.dt = self.training_fpt * self.args.dt
-        self.start_timestep = int(15 * self.training_fpt)
+        self.start_timestep = 0 #int(15 * self.training_fpt)
         
         self.all_trials = glob.glob(os.path.join(args.data_root, "**/**/**"))
 
         if self.args.n_rollout == None:
             #self.all_trials += [os.path.join(ddir_root, trial_name) for trial_name in trial_names]
             self.n_rollout = len(self.all_trials)
+            if self.indices is not None:
+                self.n_rollout = len(self.indices)
 
-            if phase == "train":
-                self.mean_time_step = int(13499/self.n_rollout) + 1
-            else:
+           # if phase == "train":
+           #     self.mean_time_step = int(13499/self.n_rollout) + 1
+           # else:
                 self.mean_time_step = 1
         else:
             ratio = self.args.train_valid_ratio
@@ -791,7 +794,7 @@ class PhysicsFleXDataset(Dataset):
     def __len__(self):
         if self.args.env == "TDWdominoes":
             # each rollout can have different length, sample length in get_item
-            return self.n_rollout * self.mean_time_step
+            return self.n_rollout #* self.mean_time_step
         else:
             return self.n_rollout * (self.args.time_step - 1)
 
@@ -865,6 +868,7 @@ class PhysicsFleXDataset(Dataset):
     def __getitem__(self, idx):
 
         if self.args.env == "TDWdominoes":
+            idx = self.indices[idx]
             idx = idx % self.n_rollout
             trial_dir = self.all_trials[idx]
             data_dir = "/".join(trial_dir.split("/")[:-1])
@@ -975,4 +979,3 @@ class PhysicsFleXDataset(Dataset):
             elif phases_dict['material'][i] in ['cloth', 'fluid']:
                 h[instance_idx[i]:instance_idx[i + 1], 1] = 1
         return x, v, h, obj_id, obj_type, v_target
-
