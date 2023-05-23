@@ -35,7 +35,7 @@ class UCF101_HDF5Maker(HDF5Maker):
             self.writer[str(self.count)].create_dataset(str(i), data=frame, dtype=dtype, compression="lzf")
 
 
-def read_video(video_file, original_fps=100, new_fps=25, context_length = 12, pred_length=4):
+def read_video(video_file, original_fps=100, new_fps=25, context_length = 12, pred_length=12):
     
     with h5py.File(video_file, 'r') as f: # load ith hdf5 file from list
         frames = list(f['frames'])
@@ -70,6 +70,7 @@ def process_video(video_file):
     try:
         images, label, stimulus = read_video(video_file)
     except StopIteration:
+        print(video_file)
         pass
         # break
     except (KeyboardInterrupt, SystemExit):
@@ -100,6 +101,8 @@ def make_h5_from_ucf(data_dir, splits_dir, split_idx, image_size, out_dir='./h5_
     idx, count = 0, 0
     for i in tqdm(range(len(videos))):
         images, labels, stimulus = process_video(videos[i])
+        if len(images) == 0:
+            continue
         if images.shape[0] < minimum_length_required:
             continue
         if isinstance(images, str) and images == "break":
@@ -109,7 +112,7 @@ def make_h5_from_ucf(data_dir, splits_dir, split_idx, image_size, out_dir='./h5_
         if not stimulus in stimulus_map.keys():
             stimulus_map[str(stimulus)] = idx
             idx += 1
-        #print(stimulus)
+
         count += 1
         h5_maker.add_data((images, labels, stimulus_map[str(stimulus)]), dtype='uint8')
 
