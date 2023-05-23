@@ -1,23 +1,17 @@
 # Region Proposal Interaction Network
 
-[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/learning-long-term-visual-dynamics-with/visual-reasoning-on-phyre-1b-cross)](https://paperswithcode.com/sota/visual-reasoning-on-phyre-1b-cross?p=learning-long-term-visual-dynamics-with) [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/learning-long-term-visual-dynamics-with/visual-reasoning-on-phyre-1b-within)](https://paperswithcode.com/sota/visual-reasoning-on-phyre-1b-within?p=learning-long-term-visual-dynamics-with)
-
-This repository is an official PyTorch implementation of the ICLR paper:
+This repository is an official PyTorch implementation of the paper:
 
 <b>Learning Long-term Visual Dynamics with Region Proposal Interaction Networks</b> <br>
-[Haozhi Qi](https://haozhi.io/),
+[Haozhi Qi](https://people.eecs.berkeley.edu/~hqi/),
 [Xiaolong Wang](https://xiaolonw.github.io/),
 [Deepak Pathak](https://www.cs.cmu.edu/~dpathak/),
 [Yi Ma](http://people.eecs.berkeley.edu/~yima/),
 [Jitendra Malik](https://people.eecs.berkeley.edu/~malik/) <br>
-International Conference on Learning Representations (ICLR), 2021 <br>
-[[Website](https://haozhiqi.github.io/RPIN)], [[Paper](http://arxiv.org/abs/2008.02265)]
+[[website](https://haozhiqi.github.io/RPIN)], [[arXiv](http://arxiv.org/abs/2008.02265)]
 
 
-Ground-Truth            |  Our Prediction | Ground-Truth  | Our Prediction
-:-------------------------:|:-------------------------:|:-------------------------:|:-------------------------: 
-![image](https://haozhi.io/RPIN/gifs/phyre/ours/gt_00023_470_000.gif)  |  ![image](https://haozhi.io/RPIN/gifs/phyre/ours/pred_00023_470_000.gif) | ![image](https://haozhi.io/RPIN/gifs/phyre/ours/gt_00022_537_000.gif) | ![image](https://haozhi.io/RPIN/gifs/phyre/ours/pred_00022_537_000.gif)
-
+![image](https://haozhiqi.github.io/RPIN/figs/teaser.png)
 
 ## Introduction
 
@@ -33,66 +27,94 @@ prediction quality and their ability to plan for downstream tasks, and also gene
 
 Our model takes N video frames as inputs and predicts the object locations for the future T timesteps, as illustrated above. We first extract the image feature representation using a ConvNet for each frame, and then apply RoI pooling to obtain object-centric visual features. These object feature representations are forwarded to the interaction modules to perform interaction reasoning and predict future object locations. The whole pipeline is trained end-to-end by minimizing the loss between predicted and the ground-truth object locations. Since the parameters of each interaction module is shared so we can apply this process recurrently over time to an arbitrary T during testing.
 
-## Using this codebase
+## Using RPIN
 
 ### Installation
 
 This codebase is developed and tested with python 3.6, PyTorch 1.4, and cuda 10.1. But any version newer than that should work.
 
-Here we gave an example of installing RPIN using the conda virtual environment:
+Here we gave an example of installing RPIN using conda virtual environment:
 ```
+git clone https://github.com/HaozhiQi/RPIN
+cd RPIN
 conda create -y -n rpin python=3.6
 conda activate rpin
 # install pytorch according to https://pytorch.org/
 conda install -y pytorch==1.4 torchvision cudatoolkit=10.1 -c pytorch
-pip install yacs hickle tqdm matplotlib
-# OpenCV changes their way of reading image and has different results
-# We don't use later version for consistency
-pip install opencv-python==3.4.2.17 
-# to evaluate phyre planning, you also need to also do
+pip install yacs
+pip install opencv-python==3.4.2.17
+# to evaluate phyre planning, you need to also do
 pip install phyre
-# (optional) install gdown for downloading
-pip install gdown
 ```
 
-Then
+### Evaluation & Training of Prediction
+
+We provide instructions for each dataset separately.
+
+1. Download data: see [DATA.md](DATA.md).
+2. Download our pre-trained models and logs from this [link](https://drive.google.com/file/d/17ZvnHodfOyag8rdO_cBC2Z1ov64uivPk/view?usp=sharing). And unzip it so that the models are placed at ```outputs/phys/${DATASET}/rpin/*```
+
+To run evaluation on the test dataset, use the following commands:
+
 ```
-git clone https://github.com/HaozhiQi/RPIN
-cd RPIN
+sh test_pred.sh ${DATASET_NAME} ${MODEL_NAME} ${CACHE_NAME} ${GPU_ID}
 ```
 
-### Data Preparation & Training & Evaluation
+For example:
 
-This codebase supports all four datasets we used in our paper. We provide the instructions for each dataset separately. Please see [PHYRE](docs/PHYRE.md), [SS](docs/SS.md), [RealB](docs/RealB.md), and [SimB](docs/SimB.md) for detailed instructions.
+```
+sh test_pred.sh simb rpin rpin ${GPU_ID}
+sh test_pred.sh realb rpin rpin ${GPU_ID}
+sh test_pred.sh phyre rpin rpin ${GPU_ID}
+sh test_pred.sh phyrec rpin rpin ${GPU_ID}
+sh test_pred.sh shape-stack rpin_vae rpin ${GPU_ID}
+```
 
-For results and models we provided in this codebase, see the [Model Zoo](docs/MODEL_ZOO.md).
+The results should be as follows:
+
+|         | SimB   | RealB | PHYRE  | PHYRE-C | ShapeStacks
+| :---:   | :---:  | :---: | :---:  | :---:   | :---:
+| [0, T]  | 2.443  | 0.341 | 4.456  | 6.873   | 1.552
+| [T, 2T] | 22.199 | 2.194 | 12.196 | 15.775  | 6.891
+
+To train your own model on our dataset, use the following command:
+```
+# Training, change ${DATASET_NAME} to simb / realb / phyre / phyrec / shape-stack
+python train.py --cfg configs/${DATASET_NAME}/rpin.yaml --gpus ${GPU_ID} --output ${OUTPUT_NAME}
+# or for shape-stack:
+python train.py --cfg configs/ss/rpin_vae.yaml --gpus ${GPU_ID} --output ${OUTPUT_NAME}
+```
+
+### Evaluation of Planning
+
+To evaluate planning performance on PHYRE and SimB, use:
+```
+sh test_plan.sh phyre rpin rpin ${GPU_ID}
+sh test_plan.sh phyrec rpin rpin ${GPU_ID}
+sh test_plan.sh simb rpin rpin ${GPU_ID}
+```
+
+The results should be as follows:
+
+|         | PHYRE  | PHYRE-C
+| :---:   | :---:  | :---:
+| Top-1 Success Rate  | 33.08 | 18.33
+| Top-100 Success Rate | 83.46 | 74.67
+
+
+| SimB Init-End Error  | SimB Hitting Accuracy
+| :---:  | :---: |
+| 7.578      | 62.20 
+
 
 ## Citing RPIN
 
 If you find **RPIN** or this codebase helpful in your research, please consider citing:
 ```
-@InProceedings{qi2021learning,
+@article{qi2020learning,
   author={Qi, Haozhi and Wang, Xiaolong and Pathak, Deepak and Ma, Yi and Malik, Jitendra},
   title={Learning Long-term Visual Dynamics with Region Proposal Interaction Networks},
-  booktitle={ICLR},
-  year={2021}
+  journal={arXiv},
+  year={2020}
 }
 ```
-
-## Log of main updates:
-
-### 2022-04-28 (Fix Download Script)
-
-Use gdown from pip to download dataset adn models.
-
-### 2021-03-31 (ICLR camera ready)
-
-Update the PHYRE reasoning results. Importantly, we remove the 2stage method for PHYRE reasoning, which significantly simplify the pipeline. See our camera ready version for detail. 
-
-### 2021-01-27 (ICLR version)
-
-Update the PHYRE reasoning results. Not it contains the full evaluation result for the benchmark.
-
-### 2020-08-05 (Init)
-
-Initial Release of this repo.

@@ -1,7 +1,6 @@
 import os
 import cv2
 import pickle
-import hickle
 import argparse
 import numpy as np
 
@@ -21,8 +20,9 @@ def main():
     print(split)
     tar_dir = f'data/{name}/{split}/'
     os.makedirs(tar_dir, exist_ok=True)
-    src_file = f'data/{name}/{split}.hkl'
-    src_data = hickle.load(src_file)
+    src_file = f'data/{name}/{split}.pkl'
+    with open(src_file, 'rb') as f:
+        src_data = pickle.load(f)
     image_data = src_data['X']
     label_data = src_data['y']
     num_seq, im_seq_len, im_h, im_w, num_channel = image_data.shape

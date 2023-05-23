@@ -168,7 +168,7 @@ def readout_h_run(sample_model, state, video, actions, seed=0, state_spec=None, 
     return readout_embed 
 
 def readout_z_run(sample_model, state, video, actions, seed=0, state_spec=None, 
-                  scenario='past', seq_len=45, open_loop_ctx=45):
+                  scenario='complete', seq_len=45, open_loop_ctx=7):
     global model
     model = sample_model
 
@@ -220,12 +220,12 @@ def readout_z_run(sample_model, state, video, actions, seed=0, state_spec=None,
     for i in tqdm(itr):
         act = actions[:, :, :seq_len]
         r, z, h, rngs = p_imagine(state, zs, act, cond, i, rngs)
-        z_hats.append(z)
-        hs.append(h)
+        z_hats.append(jax.numpy.asarray(z))
+        hs.append(jax.numpy.asarray(h))
         if scenario == 'simulation':
             zs = zs.at[:, :, i - model.config.n_cond].set(z)
-        recon.append(r)
-    encodings = jnp.stack(recon, axis=2)
-    z_hats = jnp.stack(z_hats, axis=2)
-    hs = jnp.stack(hs, axis=2)
+        recon.append(jax.numpy.asarray(r))
+    encodings = np.stack(recon, axis=2)
+    z_hats = np.stack(z_hats, axis=2)
+    hs = np.stack(hs, axis=2)
     return encodings, z_hats, hs

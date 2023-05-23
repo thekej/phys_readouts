@@ -15,10 +15,8 @@ def load_model(
     model, model_path, state_dict_key="state_dict"
 ):
     params = torch.load(model_path, map_location="cpu")
-    assert (
-        state_dict_key in params.keys()
-    ), f"{state_dict_key} not in params dictionary."
-    sd = params[state_dict_key]
+    
+    sd = params
     new_sd = OrderedDict()
     for k, v in sd.items():
         if k.startswith("module."):
@@ -29,10 +27,19 @@ def load_model(
     model.load_state_dict(new_sd)
     print(f"Loaded parameters from {model_path}")
 
-    # Set model to eval mode
+    # Set model to eval mode'''
     model.eval()
 
     return model
+
+class ID(nn.Module):
+    def __init__(self, latent_dim):
+        super().__init__()
+        self.latent_dim = latent_dim
+
+    def forward(self, x):
+        assert isinstance(x, list)
+        return x[-1]  # just return last embedding
 
 class R3M_pretrained(nn.Module):
     def __init__(self):
@@ -62,7 +69,7 @@ class LSTM(nn.Module):
 
 # Given sequence of images, predicts next latent
 class FrozenPretrainedEncoder(nn.Module):
-    def __init__(self, encoder, dynamics, n_past=7, full_rollout=True):
+    def __init__(self, encoder, dynamics, n_past=7, full_rollout=False):
         super().__init__()
 
         self.full_rollout = full_rollout
@@ -110,12 +117,10 @@ class FrozenPretrainedEncoder(nn.Module):
         simulated_states = torch.stack(simulated_states, axis=1)
         assert observed_states.shape == simulated_states.shape
 
-        loss = nn.MSELoss()(simulated_states, observed_states)
         output = {
             "input_states": input_states,
             "observed_states": observed_states,
             "simulated_states": simulated_states,
-            "loss": loss,
         }
         if self.full_rollout:
             output["states"] = torch.cat([input_states, simulated_states], axis=1)
@@ -158,7 +163,9 @@ def _get_encoder(encoder):
 
 
 def _get_dynamics(dynamics):
-    if dynamics == "lstm":
+    if dynamics == "id":
+        return ID
+    elif dynamics == "lstm":
         return LSTM
     else:
         raise NotImplementedError(dynamics)
@@ -166,4 +173,9 @@ def _get_dynamics(dynamics):
 def pfR3M_LSTM_physion(n_past=7, **kwargs):
     return FrozenPretrainedEncoder(
         encoder="r3m", dynamics="lstm", n_past=n_past, **kwargs
+    )
+
+def pfR3M_ID(n_past=7, **kwargs):
+    return FrozenPretrainedEncoder(
+        encoder="r3m", dynamics="id", n_past=n_past, **kwargs
     )

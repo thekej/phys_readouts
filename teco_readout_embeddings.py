@@ -7,6 +7,7 @@ import yaml
 import pickle
 import tqdm 
 import h5py
+import torch
 
 from torch import nn
 
@@ -38,7 +39,7 @@ def main(args):
     config.data_path = args.data_path
     data = Data(config)
     loader = data.create_iterator(train=False, prefetch=False, repeat=False)
-    data_size = 9993
+    data_size = args.size
     
     # set up new dataset
     f = h5py.File(args.save_file, "w")
@@ -48,8 +49,8 @@ def main(args):
     dset1 = f.create_dataset("label", (data_size,), dtype='f')
     if args.embeddings != 'h':
         dset2 = f.create_dataset("features_x", (data_size, n_features, 16, 16), dtype='f')
-        dset3 = f.create_dataset("features_z", (data_size, n_features, 8, 8, 256), dtype='f')
-        dset4 = f.create_dataset("features_h", (data_size, n_features - args.open_loop_ctx, 8, 8, 256), dtype='f')
+        dset3 = f.create_dataset("features_z", (data_size, n_features, 8, 8, 8), dtype='f')
+        dset4 = f.create_dataset("features_h", (data_size, n_features - args.open_loop_ctx, 8, 8, 8), dtype='f')
     else:
         dset2 = f.create_dataset("features", (data_size, 1, 8, 8, 256), dtype='f')
 
@@ -80,9 +81,12 @@ def main(args):
             z = z.reshape(-1, n_features, 8, 8, 256)
             h = h.reshape(-1, n_features - args.open_loop_ctx, 8, 8, 256)
             # aggregate
-            x = nn.AdaptiveAvgPool2d((1, 1))(torch.tensor(x))
-            z = nn.AdaptiveAvgPool3d((None, None, 1))(torch.tensor(z))
-            h = nn.AdaptiveAvgPool3d((None, None, 1))(torch.tensor(h))
+            x = torch.tensor(x)
+            x = nn.AdaptiveAvgPool2d((None, None))(x.float()) # --> 6400
+            z = torch.tensor(z)
+            z = nn.AdaptiveAvgPool3d(( 8, 8, 8))(z.float()) # --> 12800
+            h = torch.tensor(h)
+            h = nn.AdaptiveAvgPool3d(( 8, 8, 8))(h.float()) # --> 8704
             # add to data
             if (i+1)*args.batch_size < data_size:#(8, 4, 50, 16, 16) (8, 4, 50, 8, 8, 256) (8, 4, 5, 8, 8, 256)
                 dset2[i*args.batch_size:(i+1)*args.batch_size] = x.numpy()
@@ -105,9 +109,10 @@ if __name__ == '__main__':
     parser.add_argument('--embeddings', type=str, required=True)
     parser.add_argument('--scenario', type=str, default='past', required=True)
     parser.add_argument('--batch_size', type=int, default=64)
-    parser.add_argument('--seq_len', type=int, default=45)
-    parser.add_argument('--open_loop_ctx', type=int, default=None)
+    parser.add_argument('--seq_len', type=int, choices=[25, 42])
+    parser.add_argument('--open_loop_ctx', type=int, default=7)
     parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('--size', type=int, choices=[1120, 10551])
     args = parser.parse_args()
 
     main(args)

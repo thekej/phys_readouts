@@ -75,15 +75,15 @@ def main(args):
         json.dump(features, f)
 
     # Create a TFRecord writer
-    writer = tf.io.TFRecordWriter(os.path.join(args.save_path, "teco_all-test.tfrecord-00000-of-00001"))
+    writer = tf.io.TFRecordWriter(os.path.join(args.save_path, "teco-test.tfrecord-00000-of-00001"))
 
     # Iterate over the samples in the dataset
     for i in tqdm.tqdm(range(videos.shape[0])):
         # Create a feature for each video and action
-        video_feature = tf.train.Feature(int64_list=tf.train.Int64List(value=videos[i].flatten().astype(np.uint16)))
+        video_feature = tf.train.Feature(int64_list=tf.train.Int64List(value=videos[i][::6].flatten().astype(np.uint16)))
         action_feature = tf.train.Feature(int64_list=tf.train.Int64List(value=actions[i]))
         label_feature = tf.train.Feature(int64_list=tf.train.Int64List(value=[labels[i]]))
-        stimulus_feature = tf.train.Feature(int64_list=tf.train.Int64List(value=[s_map[stimulus[i]]]))
+        stimulus_feature = tf.train.Feature(int64_list=tf.train.Int64List(value=[stimulus[i]]))
         # Create a Features object for the record
         features = tf.train.Features(feature={
             "video": video_feature,
@@ -102,10 +102,10 @@ def main(args):
     # save datset info
     dataset_info = {"configName": "physion", "fileFormat": "tfrecord", 
         "moduleName": "hv.datasets.encoded_h5py_dataset.encoded_h5py_dataset",
-        "name": "teco_all",
+        "name": "teco",
         "releaseNotes": {"1.0.0": "Initial release."},
         "splits": [{"name": "test",
-                    "numBytes": str(os.path.getsize(os.path.join(args.save_path, "teco_all-test.tfrecord-00000-of-00001"))),
+                    "numBytes": str(os.path.getsize(os.path.join(args.save_path, "teco-test.tfrecord-00000-of-00001"))),
                     "shardLengths": [str(videos.shape[0])]
                    }
                   ],
@@ -118,7 +118,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', '--data', type=str, required=True)
-    parser.add_argument('-d', '--stimuli_map', type=str, required=True)
+    parser.add_argument('-m', '--stimuli_map', type=str, required=True)
     parser.add_argument('-s', '--save_path', type=str, required=True)
     args = parser.parse_args()
 

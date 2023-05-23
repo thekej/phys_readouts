@@ -38,7 +38,7 @@ def main(args):
     dset3 = f.create_dataset("observed_full_outcome", (data_size, 18, 2048), dtype='f')
     dset4 = f.create_dataset("simulation", (data_size, 18, 2048), dtype='f')
 
-
+    print('start extraction')
     for i, batch in enumerate(tqdm.tqdm(loader)):
         v_in, label_in = batch
         v_in = v_in.to('cuda')

@@ -1,0 +1,49 @@
+OUTPUT_DIR: ./outputs/tdw
+DATA_ROOT: ['/mnt/fs4/mrowca/neurips/images/rigid/contain']
+SOLVER:
+  BASE_LR: 4.0e-4  # single GPU LR
+  WEIGHT_DECAY: 1.0e-6
+  SCHEDULER: 'cosine'
+  MAX_ITERS: 2000000
+  VAL_INTERVAL: 10000
+  BATCH_SIZE: 10 # single GPU Batch Size
+INPUT:
+  IMAGE_MEAN: [171.06758758, 168.67071085, 163.45955551]
+  IMAGE_STD: [42.64549241, 43.57024312, 45.62699689]
+  TRAIN_NUM: 36355
+  TRAIN_SLICE: [30, 1024, 1] #[0, 1024, 1]
+  VAL_NUM: 28
+  VAL_SLICE: [30, 1024, 16]
+  BINARY_LABELS: ['object_data']
+  PRELOAD_TO_MEMORY: False
+RPIN:
+  BACKBONE: 'hourglass'
+  ARCH: 'rpin'
+  VE_FEAT_DIM: 256
+  IN_FEAT_DIM: 256
+  # prediction setting:
+  INPUT_SIZE: 10
+  CONS_SIZE: 1
+  PRED_SIZE_TRAIN: 5
+  PRED_SIZE_TEST: 5
+  # input setting:
+  INPUT_HEIGHT: 256
+  INPUT_WIDTH: 256
+  NUM_OBJS: 2
+  # data augmentation
+  HORIZONTAL_FLIP: True
+  VERTICAL_FLIP: True
+  # loss weight
+  OFFSET_LOSS_WEIGHT: 100.0
+  POSITION_LOSS_WEIGHT: 1.0
+  # ----- image feature
+  # IMAGE_UP: False
+  # ROI_POOL_SIZE: 3
+  # ----- coordinate feature
+  COOR_FEATURE: True
+  COOR_FEATURE_EMBEDDING: True
+  # ----- conditional computation
+  IN_CONDITION: True
+  # ----- vae setting
+  # VAE: True
+  # VAE_KL_LOSS_WEIGHT: 3e-5

@@ -67,8 +67,8 @@ def process_video(video_file, video_length, return_length_only=False):
 
 def main(args):
     # set up new dataset
-    videos = glob.glob(os.path.join(args.data_dir, "**/**/*.hdf5"))
-    corrupt = glob.glob(os.path.join(args.data_dir, '**/**/temp.hdf5'))
+    videos = glob.glob(os.path.join(args.data_dir, "**/*.hdf5"))
+    corrupt = glob.glob(os.path.join(args.data_dir, '**/temp.hdf5'))
     videos = list(set(videos) - set(corrupt))
     vid_len = 50
     
