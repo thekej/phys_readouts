@@ -36,8 +36,10 @@ def test_model(grid_search, test_data, test_label, args, result):
             
 
 def train(args):
-    with open(args.balanced_indices, 'r') as f:
-        indices = json.load(f)
+    indices = None
+    if args.balanced_indices is not None:
+        with open(args.balanced_indices, 'r') as f:
+            indices = json.load(f)
         
     # account for all but one train protocol
     print('Load data')
@@ -135,7 +137,7 @@ def main():
                         choices=['collision', 'domino', 'link', 'towers', 
                                  'contain', 'drop', 'roll'],
                         help='in case of all-but-one scenario')
-    parser.add_argument('--balanced-indices', type=str, required=True, 
+    parser.add_argument('--balanced-indices', type=str, default=None, 
                         help='path for scenario mapping')
     parser.add_argument('--train-scenario-map', type=str, required=True, 
                         help='path for scenario mapping')

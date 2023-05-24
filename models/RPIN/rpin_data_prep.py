@@ -18,18 +18,19 @@ from torchvision import transforms
 def main(args):
     # set up new dataset
     dataset = RPINDataset(args.data_dir)
-    kwargs = {'pin_memory': False, 'num_workers': 96}
+    kwargs = {'pin_memory': False, 'num_workers': 16}
     data_loader = torch.utils.data.DataLoader(dataset, 
                                                batch_size=1, 
                                                shuffle=False, 
                                                **kwargs,)
     
     f = h5py.File(args.save_path, "w")
-    dset1 = f.create_dataset("data", (len(dataset), 7, 3, 256, 256), dtype='f')
-    dset2 = f.create_dataset("rois", (len(dataset), 25, 15, 4), dtype='f')
-    dset3 = f.create_dataset("labels", (len(dataset), 18, 15, 4), dtype='f')
+    dset1 = f.create_dataset("data", (len(dataset), 15, 3, 256, 256), dtype='f')
+    dset2 = f.create_dataset("rois", (len(dataset), 25, 10, 4), dtype='f')
+    dset3 = f.create_dataset("labels", (len(dataset), 18, 10, 4), dtype='f')
     dset4 = f.create_dataset("data_last", (len(dataset), 7, 3, 256, 256), dtype='f')
-    dset6 = f.create_dataset("ignore_mask", (len(dataset), 15), dtype='f')    
+    dset5 = f.create_dataset("binary_labels", (len(dataset)), dtype='i')
+    dset6 = f.create_dataset("ignore_mask", (len(dataset), 10), dtype='f')    
 
     stimulus_map = {}
     length = []
@@ -43,6 +44,7 @@ def main(args):
         dset2[i] = rois
         dset3[i] = labels
         dset4[i] = data_last
+        dset5[i] = binary_labels
         dset6[i] = ignore_mask
         
         if not stimulus_name in stimulus_map.keys():

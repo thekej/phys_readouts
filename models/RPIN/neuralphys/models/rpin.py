@@ -52,7 +52,7 @@ class Net(nn.Module):
             graph.append(InterNet(self.in_feat_dim))
         self.graph = nn.ModuleList(graph)
 
-    def forward(self, x, rois, src_coor_features=None, num_rollouts=8, data_pred=None, phase=None, ignore_idx=None):
+    def forward(self, x, rois, src_coor_features=None, all_images=None, num_rollouts=8, data_pred=None, phase=None, ignore_idx=None):
         self.num_objs = rois.shape[2]
         # x: (b, t, c, h, w)
         # reshape time to batch dimension
@@ -61,8 +61,18 @@ class Net(nn.Module):
         # threshold, used for conditional IN computation
         r = ((rois[..., 4] - rois[..., 2]) / 2 + (rois[..., 3] - rois[..., 1]) / 2) / 2
         r = r.mean(1).detach()
-
+        
+        full_outcome_feats = None
+        if all_images is not None:
+            n_repeat = all_images.shape[1] / x.shape[1]
+            full_outcome_states = []
+            for i in range(int(n_repeat)):
+                full_outcome_feats = self.extract_object_feature(all_images[:, i*x.shape[1]:(i+1)*x.shape[1]], rois)
+                full_outcome_states += [full_outcome_feats]
+            full_outcome_states = torch.concat(full_outcome_states, axis=1)
+            full_outcome_states = torch.cat([full_outcome_states, src_coor_features[:, :all_images.shape[1]]], axis=-1)
         x = self.extract_object_feature(x, rois)
+        
 
         # coordinate feature, provided as input
         if C.RPIN.COOR_FEATURE:
@@ -106,6 +116,7 @@ class Net(nn.Module):
             'bbox': bbox_rollout,
             'encoded_states': encoded_states,
             'rollout_states': rollout_states,
+            'full_outcome_states': full_outcome_states,
             'r_ignore_idx': torch.cat([r, ignore_idx], axis=-1)
         }
         return outputs

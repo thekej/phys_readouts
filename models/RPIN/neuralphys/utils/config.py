@@ -1,4 +1,4 @@
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+# Copyright (c) Facebook3  Inc. and its affiliates. All Rights Reserved.
 from yacs.config import CfgNode as CN
 
 # -----------------------------------------------------------------------------
@@ -25,13 +25,13 @@ _C.INPUT.BINARY_LABELS = []
 # ---------------------------------------------------------------------------- #
 _C.SOLVER = CN()
 
-_C.SOLVER.BASE_LR = 2.e-6
+_C.SOLVER.BASE_LR = 1.e-6
 _C.SOLVER.LR_GAMMA = 0.1
 _C.SOLVER.VAL_INTERVAL = 16000
 _C.SOLVER.WEIGHT_DECAY = 1.e-6
 _C.SOLVER.WARMUP_ITERS = -1
-_C.SOLVER.LR_MILESTONES = [12000000, 18000000]
-_C.SOLVER.MAX_ITERS = 20000000
+_C.SOLVER.LR_MILESTONES = [500000, 1800000]
+_C.SOLVER.MAX_ITERS = 10000000
 _C.SOLVER.BATCH_SIZE = 16
 _C.SOLVER.SCHEDULER = 'step'
 
@@ -41,23 +41,23 @@ _C.SOLVER.SCHEDULER = 'step'
 _C.RPIN = CN()
 _C.RPIN.ARCH = 'rpin'
 _C.RPIN.BACKBONE = 'hourglass'
-_C.RPIN.HORIZONTAL_FLIP = True
-_C.RPIN.VERTICAL_FLIP = True
+_C.RPIN.HORIZONTAL_FLIP = False #True
+_C.RPIN.VERTICAL_FLIP = False #True
 # prediction setting
-_C.RPIN.INPUT_SIZE = 7
+_C.RPIN.INPUT_SIZE = 5
 _C.RPIN.CONS_SIZE = 1
-_C.RPIN.PRED_SIZE_TRAIN = 18
-_C.RPIN.PRED_SIZE_TEST = 18
+_C.RPIN.PRED_SIZE_TRAIN = 11
+_C.RPIN.PRED_SIZE_TEST = 11
 # input for mixed dataset
 _C.RPIN.INPUT_HEIGHT = 256
 _C.RPIN.INPUT_WIDTH = 256
 # training setting
-_C.RPIN.NUM_OBJS = 15 #3
-_C.RPIN.OFFSET_LOSS_WEIGHT = 100.0
+_C.RPIN.NUM_OBJS = 10 #3
+_C.RPIN.OFFSET_LOSS_WEIGHT = 1.0
 _C.RPIN.POSITION_LOSS_WEIGHT = 1.0
 # additional input
-_C.RPIN.IMAGE_UP = True
-_C.RPIN.ROI_POOL_SIZE = 1
+_C.RPIN.IMAGE_UP = False
+_C.RPIN.ROI_POOL_SIZE = 3
 _C.RPIN.COOR_FEATURE = True
 _C.RPIN.COOR_FEATURE_EMBEDDING = True
 _C.RPIN.IN_CONDITION = True

@@ -44,7 +44,7 @@ class Trainer(object):
         self.logger.info('Training done.')
 
     def train_epoch(self):
-        for batch_idx, (data, boxes, labels, data_last, ignore_idx) in enumerate(self.train_loader):
+        for batch_idx, (data, boxes, labels, data_last, ignore_idx, _, _) in enumerate(self.train_loader):
             self._adjust_learning_rate()
             data = data.to(self.device)
             labels = labels.to(self.device)
@@ -78,7 +78,7 @@ class Trainer(object):
     def val(self):
         self.model.eval()
         val_loss = 0
-        for batch_idx, (data, boxes, labels, _, ignore_idx) in enumerate(self.val_loader):
+        for batch_idx, (data, boxes, labels, _, ignore_idx, _, _) in enumerate(self.val_loader):
             tprint(f'eval: {batch_idx}/{len(self.val_loader)}')
             with torch.no_grad():
                 data = data.to(self.device)
@@ -102,9 +102,16 @@ class Trainer(object):
         ignore_idx = ignore_idx[:, None, :, None].to('cuda')
         loss = loss * ignore_idx
         loss = loss.sum(2) / ignore_idx.sum(2)
-        loss[..., 0:2] = loss[..., 0:2] * self.offset_loss_weight
-        loss[..., 2:4] = loss[..., 2:4] * self.position_loss_weight
-        loss = loss.mean(0).sum()
+        loss[..., 0:2] = loss[..., 0:2] #* self.offset_loss_weight
+        loss[..., 2:4] = loss[..., 2:4] #* self.position_loss_weight
+        #loss = loss.mean(0).sum()
+        loss = loss.mean(0)
+        init_tau = C.RPIN.DISCOUNT_TAU ** (1 / self.ptrain_size)
+        tau = init_tau + (self.iterations / self.max_iters) * (1 - init_tau)
+        tau = torch.pow(tau, torch.arange(11, out=torch.FloatTensor()))[:, None]
+        tau = tau.to("cuda")
+       # tau = torch.cat([torch.ones(5, 1), tau], dim=0).to('cuda')
+        loss = ((loss * tau) / tau.sum(axis=0, keepdims=True)).sum()
 
         if C.RPIN.VAE and phase == 'train':
             kl_loss = outputs['kl_loss']
