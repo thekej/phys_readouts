@@ -37,30 +37,32 @@ def encode_image(x, model, state):
     return out
 
 def process_video(video_file, video_length, return_length_only=False):
+    try:
+        with h5py.File(video_file, 'r') as f: # load ith hdf5 file from list
+            frames = list(f['frames'])
+            target_contacted_zone = False
+            for frame in reversed(frames):
+                lbl = f['frames'][frame]['labels']['target_contacting_zone'][()]
+                if lbl: # as long as one frame touching, label is True
+                    target_contacted_zone = True
+                    break
 
-    with h5py.File(video_file, 'r') as f: # load ith hdf5 file from list
-        frames = list(f['frames'])
-        target_contacted_zone = False
-        for frame in reversed(frames):
-            lbl = f['frames'][frame]['labels']['target_contacting_zone'][()]
-            if lbl: # as long as one frame touching, label is True
-                target_contacted_zone = True
-                break
-
-        images = []
+            images = []
         
-        for i, frame in enumerate(frames):
-            img = f['frames'][frame]['images']['_img_cam0'][:]
-            img = Image.open(io.BytesIO(img)) # (256, 256, 3)
-            pil_image = img.resize((128, 128), Image.LANCZOS) 
-            pil_image = np.expand_dims(np.array(pil_image), axis=0)
-            pil_image = 2 * (pil_image / 255.0) - 1
-            pil_image = jax.numpy.array(pil_image)
-            images.append(pil_image)
+            for i, frame in enumerate(frames):
+                img = f['frames'][frame]['images']['_img_cam0'][:]
+                img = Image.open(io.BytesIO(img)) # (256, 256, 3)
+                pil_image = img.resize((128, 128), Image.LANCZOS) 
+                pil_image = np.expand_dims(np.array(pil_image), axis=0)
+                pil_image = 2 * (pil_image / 255.0) - 1
+                pil_image = jax.numpy.array(pil_image)
+                images.append(pil_image)
         
-        action = np.zeros(video_length)
-        label = 1 if target_contacted_zone else 0
-        stimulus = f['static']['stimulus_name'][()]
+            action = np.zeros(video_length)
+            label = 1 if target_contacted_zone else 0
+            stimulus = f['static']['stimulus_name'][()]
+    except:
+        images, label, action, stimulus, frames = [], [], [], [], []
     return images, label, action, stimulus, len(frames)
 
 def main(args):
@@ -68,16 +70,13 @@ def main(args):
     videos = glob.glob(os.path.join(args.data_dir, "**/*.hdf5"))
     corrupt = glob.glob(os.path.join(args.data_dir, '**/temp.hdf5'))
     videos = list(set(videos) - set(corrupt))
-    vid_len = 250
-    
-    
+    vid_len = 50
     
     f = h5py.File(args.save_path, "w")
     dset1 = f.create_dataset("video", (len(videos), vid_len, 16, 16), dtype='f')
     dset2 = f.create_dataset("action", (len(videos), vid_len), dtype='i')
     dset3 = f.create_dataset("label", (len(videos),), dtype='i')
     dset4 = f.create_dataset("stimulus", (len(videos),), dtype='i')
-    
     
     # load model
     model, state, config = load_vqgan_model(args.vqgan_checkpoint)
@@ -89,16 +88,22 @@ def main(args):
     video_encode = jax.jit(wrap_apply(model.encode))
     stimulus_map = {}
     length = []
-    idx = 0
+    idx, video_idx = 0, 0
     for i in tqdm.tqdm(range(len(videos))):
         images, labels, actions, stimulus, l = process_video(videos[i], vid_len, True)
+        if len(images) == 0:
+            dset1[i] = dset1[i-1]
+            dset2[i] = dset2[i-1]
+            dset3[i] = dset3[i-1]
+            dset4[i] = dset4[i-1]
+            continue
         encoded_images = []
         for j, im in enumerate(images):
             if j < vid_len:
                 p_encode = video_encode(im)
                 encoded_images += [p_encode[1].squeeze(0)]
-        if vid_len > l:
-            encoded_images += [p_encode[1].squeeze(0)] * (vid_len - l)
+        if vid_len > len(encoded_images):
+            encoded_images += [p_encode[1].squeeze(0)] * (vid_len - len(encoded_images))
 
         encoded_images = np.stack(encoded_images)
 
@@ -110,6 +115,7 @@ def main(args):
         dset2[i] = actions
         dset3[i] = labels
         dset4[i] = stimulus_map[str(stimulus)]
+        #video_idx += 1
 
     f.close()
 

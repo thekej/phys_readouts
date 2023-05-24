@@ -6,9 +6,11 @@ import tqdm
 import h5py
 import torch 
 
-from r3m_model import FrozenPretrainedEncoder, load_model
+from r3m_model import FrozenPretrainedEncoder, load_model, pfR3M_LSTM_physion
 from r3m_loader import R3MDataset
 from torch.utils.data import Dataset, DataLoader
+from collections import OrderedDict
+
 
 
 def main(args):
@@ -25,10 +27,7 @@ def main(args):
     print('load data')
     dataset = R3MDataset(args.data_path)
     loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False)
-    data_size = 0
-    for b in loader:
-        v_in, label_in = b
-        data_size += v_in.shape[0]
+    data_size = len(dataset)
         
     n_features = 10
     # set up new dataset

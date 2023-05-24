@@ -15,12 +15,13 @@ def load_model(
     model, model_path, state_dict_key="state_dict"
 ):
     params = torch.load(model_path, map_location="cpu")
-    
     sd = params
     new_sd = OrderedDict()
     for k, v in sd.items():
-        if k.startswith("module."):
-            name = k[7:]  # remove 'module.' of dataparallel/DDP
+        if k.startswith("module.") and 'r3m' in k:
+            name = 'encoder.r3m.module.' + k[19:]  # remove 'module.' of dataparallel/DDP
+        elif k.startswith("module.") and 'dynamics' in k:
+            name = k[7:]
         else:
             name = k
         new_sd[name] = v
