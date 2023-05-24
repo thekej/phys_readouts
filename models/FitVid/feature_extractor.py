@@ -9,6 +9,7 @@ import torch
 from fitvid import FitVid
 from fitvid_loader import ReadoutDataset
 from torch.utils.data import Dataset, DataLoader
+from collections import OrderedDict
 
 def load_model(
     model, model_path, state_dict_key="state_dict"
@@ -42,16 +43,16 @@ def main(args):
     print('load data')
     dataset = ReadoutDataset(args.data_path)
     loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False)
-    data_size = 0
-    for b in loader:
-        v_in, label_in = b
-        data_size += v_in.shape[0]
+    data_size = 5608
+    #for b in loader:
+    #    v_in, label_in = b
+    #    data_size += v_in.shape[0]
         
     n_features = 10
     # set up new dataset
     f = h5py.File(args.save_file, "w")
     dset1 = f.create_dataset("label", (data_size,), dtype='f')
-    dset2 = f.create_dataset("features", (data_size, 25, 2048), dtype='f')
+    dset2 = f.create_dataset("features", (data_size, 24, 128), dtype='f')
 
     print('start extraction')
     for i, batch in enumerate(tqdm.tqdm(loader)):
