@@ -14,10 +14,11 @@ from datasets.bair import BAIRDataset
 from datasets.kth import KTHDataset
 from datasets.cityscapes import CityscapesDataset
 from datasets.ucf101 import UCF101Dataset
+from datasets.ego4d import EGO4Dataset
 from torch.utils.data import Subset
 
 
-DATASETS = ['CIFAR10', 'CELEBA', 'LSUN', 'FFHQ', 'IMAGENET', 'MOVINGMNIST', 'STOCHASTICMOVINGMNIST', 'BAIR', 'KTH', 'CITYSCAPES', 'UCF101']
+DATASETS = ['CIFAR10', 'CELEBA', 'LSUN', 'FFHQ', 'IMAGENET', 'MOVINGMNIST', 'STOCHASTICMOVINGMNIST', 'BAIR', 'KTH', 'CITYSCAPES', 'UCF101', 'EGO4D']
 
 
 def get_dataloaders(data_path, config):
@@ -212,6 +213,26 @@ def get_dataset(data_path, config, video_frames_pred=0, start_at=0):
         dataset = UCF101Dataset(data_path, frames_per_sample=frames_per_sample, image_size=config.data.image_size, train=True, random_time=True,
                                 random_horizontal_flip=config.data.random_flip)
         test_dataset = UCF101Dataset(data_path, frames_per_sample=frames_per_sample, image_size=config.data.image_size, train=False, random_time=True,
+                                     random_horizontal_flip=False, total_videos=256)
+    elif config.data.dataset.upper() == "EGO4D":
+        with open( '/ccn2/u/thekej/ego4d/kinetics_400_train_list.txt', 'r') as f:
+            all_training_videos = f.readlines()
+        all_training_videos = [_.strip().split(' ')[0] for _ in all_training_videos]
+
+        with open('/ccn2/u/thekej/ego4d/kinetics_400_val_list.txt', 'r') as f:
+            all_validation_videos = f.readlines()
+        all_validation_videos = [_.strip().split(' ')[0] for _ in all_validation_videos]
+
+        with open('/ccn2/u/thekej/ego4d/ego4d_train_list_320p_chunked.txt', 'r') as f:
+            ego4d_videos = f.readlines()
+        ego4d_videos = [_.strip().split(' ')[0] for _ in ego4d_videos]
+        
+        frames_per_sample = config.data.num_frames_cond + getattr(config.data, "num_frames_future", 0) + video_frames_pred
+        dataset = EGO4Dataset(all_training_videos + ego4d_videos, 
+                              frames_per_sample=frames_per_sample, image_size=config.data.image_size, 
+                              train=True, random_time=True, random_horizontal_flip=config.data.random_flip)
+        test_dataset = EGO4Dataset(all_validation_videos, frames_per_sample=frames_per_sample, 
+                                     image_size=config.data.image_size, train=False, random_time=True,
                                      random_horizontal_flip=False, total_videos=256)
 
     subset_num = getattr(config.data, "subset", -1)

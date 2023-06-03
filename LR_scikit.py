@@ -34,6 +34,11 @@ def test_model(grid_search, test_data, test_label, args, result):
             print(f"Accuracy on %s test data: {accuracy:.4f}"%sc)
     return result
             
+def get_indices(scenarios_indices):
+    indices = []
+    for k in scenarios_indices.keys():
+        indices += scenarios_indices[k]
+    return indices
 
 def train(args):
     indices = None
@@ -46,6 +51,8 @@ def train(args):
     if args.all_but_one is not None:
         with open(args.train_scenario_map, 'r') as f:
             scenarios_indices = json.load(f)
+            if indices is None:
+                indices = get_indices(scenarios_indices)
             banned_scenario = scenarios_indices[args.all_but_one]
             indices = list(set(indices) - set(banned_scenario))
             print('Removing %d datapoints from the %s scenario'%(len(banned_scenario),
@@ -57,7 +64,7 @@ def train(args):
     X = load_hdf5(args.data_path, scenario_feature, indices)
     if args.scenario_name in ['observed_gamma', 'observed_beta']:
         X = X[:, 0]
-    elif args.scenario_name == 'observed_teco':
+    elif args.scenario_name in ['observed_teco', 'observed_fitvid', 'observed_ego4d_fitvid']:
         print(X.shape)
         X = X[:, :7]
         print(X.shape)
@@ -69,7 +76,7 @@ def train(args):
     # Define the hyperparameter grid to search
     print('Load model')
     if args.model_type == 'logistic':
-        param_grid = {'clf__C': np.logspace(-7, -1, 7), 'clf__penalty': ['l2']}
+        param_grid = {'clf__C': np.array([0.01, 0.1, 1, 5, 10, 20, 50]), 'clf__penalty': ['l2']}#np.logspace(-1, 3, 5), 'clf__penalty': ['l2']}
         model = LogisticRegression(max_iter=20000)
     elif args.model_type == 'svc':
         param_grid = {'clf__C': np.logspace(-3, 0, 4), 'clf__loss': ['hinge']}
@@ -99,7 +106,7 @@ def train(args):
     test_data = load_hdf5(args.test_path, scenario_feature)
     if args.scenario_name in ['observed_gamma', 'observed_beta']:
         test_data = test_data[:, 0]
-    elif args.scenario_name == 'observed_teco':
+    elif args.scenario_name in ['observed_teco', 'observed_fitvid', 'observed_ego4d_fitvid']:
         test_data = test_data[:, :7]
     test_label = load_hdf5(args.test_path, 'label')
     result = test_model(grid_search, test_data, test_label, args, result)

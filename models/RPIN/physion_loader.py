@@ -135,10 +135,9 @@ class RPINDataset(Dataset):
 
             rois = np.array(rois, dtype=np.float32)
             num_objs = rois.shape[1]
-            max_objs = 10 # self.pretraining_cfg.MODEL.RPIN.NUM_OBJS # TODO: do padding elsewhere?
-            num_objs = rois.shape[1]
             if num_objs < 1:
                 return self.__getitem__(index-1)
+            max_objs = 10 # self.pretraining_cfg.MODEL.RPIN.NUM_OBJS # TODO: do padding elsewhere?
             #assert num_objs <= max_objs, f'num objs {num_objs} greater than max objs {max_objs}'
             ignore_mask = np.ones(max_objs, dtype=np.float32)
             if num_objs < max_objs:
