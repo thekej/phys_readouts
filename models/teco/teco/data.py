@@ -19,13 +19,21 @@ def is_tfds_folder(path):
         return osp.exists(path)
 
 
-def load_hdf5(config):
+def load_hdf5(config, split='train'):
     def read(path):
         with h5py.File(path, 'r') as hf:
-            video = hf['video'][:]
-            actions = actions = np.zeros((video.shape[0],), dtype=np.int32)#hf['actions'][:]
-            label = hf['label'][:]
-
+            if split == 'train':
+                split_size = int(0.9* hf['label'].shape[0])
+                video = hf['video'][:split_size]
+                actions = actions = np.zeros((video.shape[0],), dtype=np.int32)#hf['actions'][:]
+                label = hf['label'][:split_size]
+                print('Train Dataset size:', split_size)
+            else:
+                split_size = int(0.9* hf['label'].shape[0])
+                video = hf['video'][split_size:]
+                actions = actions = np.zeros((video.shape[0],), dtype=np.int32)#hf['actions'][:]
+                label = hf['label'][split_size:]
+                print('Test Dataset size:', video.shape[0])
         return video, actions, label
 
     video, actions, label = read(config.data_path)
@@ -160,7 +168,7 @@ class Data:
             if 'dmlab' in self.config.data_path:
                 dataset = load_npz(self.config, split_name, num_ds_shards, ds_shard_id)
             if 'teco' in self.config.data_path:
-                dataset = load_hdf5(self.config) 
+                dataset = load_hdf5(self.config, split_name) 
             else:
                 dataset = load_video(self.config, split_name, num_ds_shards, ds_shard_id)
         else:

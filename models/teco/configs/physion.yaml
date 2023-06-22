@@ -2,7 +2,7 @@ seed: 1
 cache: false # caching available only for encoded datasets
 
 # Training
-batch_size: 8
+batch_size: 14
 num_workers: 4
 lr: 0.0001
 lr_schedule: "cosine"
@@ -33,8 +33,8 @@ encoder: # encoder / decoder are mirrored, with decoder depths reversed
   blocks: 8
 
 decoder: # encoder / decoder are mirrored, with decoder depths reversed
-  depths: [256, 512] # 16x16 -> 8x8
-  blocks: 10
+  depths: [128, 256] #[256, 512] # 16x16 -> 8x8
+  blocks: 8 #10
 
 z_ds: 2 # 8x8 -> 4x4
 z_tfm_kwargs:
@@ -49,9 +49,9 @@ z_git:
   vocab_dim: 256
   mask_schedule: "cosine"
   tfm_kwargs:
-    embed_dim: 1024
-    mlp_dim: 4096
-    num_heads: 16
+    embed_dim: 512 #1024
+    mlp_dim: 2048 #4096
+    num_heads: 8 #16
     num_layers: 24
     dropout: 0.
     attention_dropout: 0.
