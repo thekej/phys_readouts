@@ -54,12 +54,11 @@ def main(args):
     else:
         dset2 = f.create_dataset("features", (data_size, 1, 8, 8, 256), dtype='f')
 
-
     for i, batch in enumerate(tqdm.tqdm(loader)):
         v_in = batch['video']
         act_in = batch['actions']
         label_in = batch['label']
-
+        
         if (i+1)*args.batch_size < data_size:
             dset1[i*args.batch_size:(i+1)*args.batch_size] = label_in.reshape(-1)
         else:

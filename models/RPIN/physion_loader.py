@@ -71,8 +71,8 @@ class RPINDataset(Dataset):
         subsample_factor=6,
         seed=0,
         ):
-        videos = glob.glob(os.path.join(data_root, "**/**/*.hdf5"))
-        corrupt = glob.glob(os.path.join(data_root, '**/**/temp.hdf5'))
+        videos = glob.glob(os.path.join(data_root, "**/*.hdf5"))
+        corrupt = glob.glob(os.path.join(data_root, '**/temp.hdf5'))
         self.hdf5_files = list(set(videos) - set(corrupt))
         self.indices = indices
         self.seq_len = seq_len
@@ -135,8 +135,10 @@ class RPINDataset(Dataset):
 
             rois = np.array(rois, dtype=np.float32)
             num_objs = rois.shape[1]
-            max_objs = 15 # self.pretraining_cfg.MODEL.RPIN.NUM_OBJS # TODO: do padding elsewhere?
-            assert num_objs <= max_objs, f'num objs {num_objs} greater than max objs {max_objs}'
+            if num_objs < 1:
+                return self.__getitem__(index-1)
+            max_objs = 10 # self.pretraining_cfg.MODEL.RPIN.NUM_OBJS # TODO: do padding elsewhere?
+            #assert num_objs <= max_objs, f'num objs {num_objs} greater than max objs {max_objs}'
             ignore_mask = np.ones(max_objs, dtype=np.float32)
             if num_objs < max_objs:
                 rois = np.pad(rois, [(0,0), (0, max_objs-num_objs), (0,0)])
@@ -148,13 +150,13 @@ class RPINDataset(Dataset):
             stimulus_name = f['static']['stimulus_name'][()]
 
         sample = {
-            'data': images[:self.state_len],
-            'rois': rois,
-            'labels': labels, # [off, pos]
+            'data': images[:15],#self.state_len],
+            'rois': rois[:, :max_objs],
+            'labels': labels[:, :max_objs], # [off, pos]
             'data_last': images[:self.state_len],
             'ignore_mask': torch.from_numpy(ignore_mask),
             'stimulus_name': stimulus_name,
-            'binary_labels': binary_labels,
+            'binary_labels': binary_labels[0],
             'images': images,
         }
         return sample
@@ -177,4 +179,5 @@ class RPINTrainDataset(Dataset):
         labels = self.dataset["labels"][index]
         data_last = self.dataset["data_last"][index]
         ignore_mask = self.dataset["ignore_mask"][index]
-        return data, boxes, labels, data_last, ignore_mask
+        binary_label = self.dataset["binary_labels"][index]
+        return data[:5], boxes[:16, :10, :], labels[:11, :10, :], data_last[:5], ignore_mask[:10], data[:15], binary_label

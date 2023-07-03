@@ -165,10 +165,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-o', '--output_dir', type=str, required=True)
     parser.add_argument('-c', '--config', type=str, required=True)
+    parser.add_argument('-e', '--experiment', type=str, required=True)
     args = parser.parse_args()
 
-    args.run_id = args.output_dir
-
+    #args.run_id = args.output_dir
+    args.run_id = args.experiment 
+    
     print(f'JAX process: {jax.process_index()} / {jax.process_count()}')
     print(f'JAX total devices: {jax.device_count()}')
     print(f'JAX local devices: {jax.local_device_count()}')

@@ -1,4 +1,5 @@
 import glob
+import h5py
 import os.path as osp
 import numpy as np
 from flax import jax_utils
@@ -16,6 +17,38 @@ def is_tfds_folder(path):
         return tf.io.gfile.exists(path)
     else:
         return osp.exists(path)
+
+
+def load_hdf5(config, split='train'):
+    def read(path):
+        with h5py.File(path, 'r') as hf:
+            if split == 'train':
+                split_size = int(0.9* hf['label'].shape[0])
+                video = hf['video'][:split_size]
+                actions = actions = np.zeros((video.shape[0],), dtype=np.int32)#hf['actions'][:]
+                label = hf['label'][:split_size]
+                print('Train Dataset size:', split_size)
+            else:
+                split_size = int(0.9* hf['label'].shape[0])
+                video = hf['video'][split_size:]
+                actions = actions = np.zeros((video.shape[0],), dtype=np.int32)#hf['actions'][:]
+                label = hf['label'][split_size:]
+                print('Test Dataset size:', video.shape[0])
+        return video, actions, label
+
+    video, actions, label = read(config.data_path)
+
+    # If you want to convert these numpy arrays to tf.Tensor
+    video = tf.convert_to_tensor(video, dtype=tf.int32)
+    actions = tf.convert_to_tensor(actions, dtype=tf.int32)
+    label = tf.convert_to_tensor(label, dtype=tf.int32)
+
+    # Create a dataset from tensor slices
+    data_dict = {'video': video, 'actions': actions, 'label': label}
+    dataset = tf.data.Dataset.from_tensor_slices(data_dict)
+    #dataset = tf.data.Dataset.from_tensor_slices((video, actions, label))
+
+    return dataset
 
 
 def load_npz(config, split, num_ds_shards, ds_shard_id):
@@ -134,6 +167,8 @@ class Data:
         if not is_tfds_folder(self.config.data_path):
             if 'dmlab' in self.config.data_path:
                 dataset = load_npz(self.config, split_name, num_ds_shards, ds_shard_id)
+            if 'teco' in self.config.data_path:
+                dataset = load_hdf5(self.config, split_name) 
             else:
                 dataset = load_video(self.config, split_name, num_ds_shards, ds_shard_id)
         else:

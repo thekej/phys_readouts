@@ -48,10 +48,10 @@ def sample(sample_model, state, video, actions, seed=0, state_spec=None):
     assert model.config.n_cond <= model.config.open_loop_ctx
 
     if not model.config.use_actions:
-        if actions is None:
-            actions = jnp.zeros(video.shape[:3], dtype=jnp.int32)
-        else:
-            actions = jnp.zeros_like(actions)
+        #if actions is None:
+        actions = jnp.zeros(video.shape[:3], dtype=jnp.int32)
+        #else:
+        #    actions = jnp.zeros_like(actions)
     
     if video.shape[0] < jax.local_device_count():
         devices = jax.local_devices()[:video.shape[0]]
@@ -84,7 +84,7 @@ def sample(sample_model, state, video, actions, seed=0, state_spec=None):
             i = model.config.seq_len - 1
         else:
             act = actions[:, :, :model.config.seq_len]
-        r, z, rngs = p_imagine(state, zs, act, cond, i, rngs)
+        r, z, _, rngs = p_imagine(state, zs, act, cond, i, rngs)
         zs = zs.at[:, :, i - model.config.n_cond].set(z)
         recon.append(r)
     encodings = jnp.stack(recon, axis=2)
@@ -101,8 +101,8 @@ def sample(sample_model, state, video, actions, seed=0, state_spec=None):
         samples = np.reshape(samples, (-1, *samples.shape[3:]))
 
         recons = []
-        for i in list(range(0, N * B * T, 64)):
-            inp = samples[i:i + 64]
+        for i in list(range(0, N * B * T, 63)):
+            inp = samples[i:i + 63]
             inp = np.reshape(inp, (N, -1, *inp.shape[1:]))
             recon = jax.pmap(_decode, devices=devices)(inp)
             recon = jax.device_get(recon)

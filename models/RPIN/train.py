@@ -93,12 +93,12 @@ def main():
     val_indices = list(set(indices) - set(train_indices))
     train_set = RPINTrainDataset(args.data_path, train_indices)
     val_set = RPINTrainDataset(args.data_path, val_indices)
-    kwargs = {'pin_memory': False, 'num_workers': 96} #16
+    kwargs = {'pin_memory': True, 'num_workers': 0} #16
     train_loader = torch.utils.data.DataLoader(
-        train_set, batch_size=cfg.SOLVER.BATCH_SIZE, shuffle=True, **kwargs,
+        train_set, batch_size=cfg.SOLVER.BATCH_SIZE, shuffle=True, drop_last=True, **kwargs,
     )
     val_loader = torch.utils.data.DataLoader(
-        val_set, batch_size=1 if cfg.RPIN.VAE else cfg.SOLVER.BATCH_SIZE, shuffle=False, **kwargs,
+        val_set, batch_size=1 if cfg.RPIN.VAE else cfg.SOLVER.BATCH_SIZE, shuffle=False, drop_last=True, **kwargs,
     )
     print(f'size: train {len(train_indices)} / test {len(val_indices)}')
 

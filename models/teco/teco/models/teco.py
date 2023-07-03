@@ -141,10 +141,11 @@ class TECO(nn.Module):
     def __call__(self, video, actions, deterministic=False):
         # video: BTCHW, actions: BT
         if not self.config.use_actions:
-            if actions is None:
-                actions = jnp.zeros(video.shape[:2], dtype=jnp.int32)
-            else:
-                actions = jnp.zeros_like(actions)
+            #print('actions: ', actions)
+            #if actions is None:
+            actions = jnp.zeros(video.shape[:2], dtype=jnp.int32)
+            #else:
+            #    actions = jnp.zeros_like(actions)
  
         if self.config.dropout_actions:
             dropout_actions = jax.random.bernoulli(self.make_rng('sample'), p=0.5,
@@ -156,7 +157,7 @@ class TECO(nn.Module):
         
         cond, vq_output = self.encode(encodings)
         z_embeddings, z_codes = vq_output['embeddings'], vq_output['encodings']
-
+        
         deter = self.temporal_transformer(
             z_embeddings, actions, cond, deterministic=deterministic
         )
