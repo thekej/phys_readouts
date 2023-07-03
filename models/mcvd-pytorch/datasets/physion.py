@@ -40,12 +40,7 @@ class PhysionDataset(Dataset):
         self.indices = []
         for v in range(self.num_train_vids):
             shard_idx, idx_in_shard = self.videos_ds.get_indices(v)
-            if self.complete or self.simulation:
-                self.indices += [(shard_idx, idx_in_shard)]
-            with self.videos_ds.opener(self.videos_ds.shard_paths[shard_idx]) as f:
-                if f['len'][str(idx_in_shard)][()] >= frames_per_sample and not self.complete and not self.simulation:
-                    self.indices += [(shard_idx, idx_in_shard)]
-
+            self.indices += [(shard_idx, idx_in_shard)]
         print(f"Dataset length: {self.__len__()}")
 
     def len_of_vid(self, index):
@@ -76,16 +71,11 @@ class PhysionDataset(Dataset):
             target = int(f['target'][str(idx_in_shard)][()])
             # slice data
             video_len = f['len'][str(idx_in_shard)][()]
-            if self.complete or self.simulation:
-                if video_len < self.frames_per_sample:
-                    for i in range(video_len):
-                        img = f[str(idx_in_shard)][str(i)][()]
-                        prefinals.append(data_transform(img))
-                    prefinals += [data_transform(img)] * (self.frames_per_sample - video_len)
-                else:
-                    for i in range(self.frames_per_sample):
-                        img = f[str(idx_in_shard)][str(i)][()]
-                        prefinals.append(data_transform(img))
+            if video_len < self.frames_per_sample:
+                for i in range(video_len):
+                    img = f[str(idx_in_shard)][str(i)][()]
+                    prefinals.append(data_transform(img))
+                prefinals += [data_transform(img)] * (self.frames_per_sample - video_len)
             else:
                 for i in range(self.frames_per_sample):
                     img = f[str(idx_in_shard)][str(i)][()]

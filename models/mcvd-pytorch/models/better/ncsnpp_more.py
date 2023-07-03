@@ -373,9 +373,8 @@ class NCSNpp(nn.Module):
 
     assert not hs
     # GroupNorm
-    h = modules[m_idx](h)
+    h, _, _ = modules[m_idx](h)
     m_idx += 1
-
     # conv3x3_last
     h = modules[m_idx](h)
     m_idx += 1

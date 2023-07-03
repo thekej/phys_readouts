@@ -36,8 +36,10 @@ def test_model(grid_search, test_data, test_label, args, result):
             
 
 def train(args):
-    with open(args.balanced_indices, 'r') as f:
-        indices = json.load(f)
+    indices = None
+    if args.balanced_indices is not None:
+        with open(args.balanced_indices, 'r') as f:
+            indices = json.load(f)
         
     # account for all but one train protocol
     print('Load data')
@@ -55,7 +57,7 @@ def train(args):
     X = load_hdf5(args.data_path, scenario_feature, indices)
     if args.scenario_name in ['observed_gamma', 'observed_beta']:
         X = X[:, 0]
-    elif args.scenario_name == 'observed_teco':
+    elif args.scenario_name in ['observed_teco', 'observed_fitvid']:
         print(X.shape)
         X = X[:, :7]
         print(X.shape)
@@ -67,7 +69,7 @@ def train(args):
     # Define the hyperparameter grid to search
     print('Load model')
     if args.model_type == 'logistic':
-        param_grid = {'clf__C': np.logspace(-7, -1, 7), 'clf__penalty': ['l2']}
+        param_grid = {'clf__C': np.logspace(-7, 2, 10), 'clf__penalty': ['l2']}
         model = LogisticRegression(max_iter=20000)
     elif args.model_type == 'svc':
         param_grid = {'clf__C': np.logspace(-3, 0, 4), 'clf__loss': ['hinge']}
@@ -97,7 +99,7 @@ def train(args):
     test_data = load_hdf5(args.test_path, scenario_feature)
     if args.scenario_name in ['observed_gamma', 'observed_beta']:
         test_data = test_data[:, 0]
-    elif args.scenario_name == 'observed_teco':
+    elif args.scenario_name in ['observed_teco', 'observed_fitvid']:
         test_data = test_data[:, :7]
     test_label = load_hdf5(args.test_path, 'label')
     result = test_model(grid_search, test_data, test_label, args, result)
@@ -135,7 +137,7 @@ def main():
                         choices=['collision', 'domino', 'link', 'towers', 
                                  'contain', 'drop', 'roll'],
                         help='in case of all-but-one scenario')
-    parser.add_argument('--balanced-indices', type=str, required=True, 
+    parser.add_argument('--balanced-indices', type=str, default=None, 
                         help='path for scenario mapping')
     parser.add_argument('--train-scenario-map', type=str, required=True, 
                         help='path for scenario mapping')

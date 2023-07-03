@@ -110,13 +110,10 @@ def conditioning_fn(config, X, num_frames_pred=0, prob_mask_cond=0.0, prob_mask_
     train = config.data.num_frames
     pred = num_frames_pred
     future = getattr(config.data, "num_frames_future", 0)
-
     # Frames to train on / sample
     pred_frames = X[:, cond:cond+pred].reshape(len(X), -1, imsize, imsize)
-
     # Condition (Past)
     cond_frames = X[:, :cond].reshape(len(X), -1, imsize, imsize)
-
     if prob_mask_cond > 0.0:
         cond_mask = (torch.rand(X.shape[0], device=X.device) > prob_mask_cond)
         cond_frames = cond_mask.reshape(-1, 1, 1, 1) * cond_frames
@@ -143,7 +140,6 @@ def conditioning_fn(config, X, num_frames_pred=0, prob_mask_cond=0.0, prob_mask_
             #     future_mask = None
 
         cond_frames = torch.cat([cond_frames, future_frames], dim=1)
-
     return pred_frames, cond_frames, cond_mask   # , future_mask
 
 

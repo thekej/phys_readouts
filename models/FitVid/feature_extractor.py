@@ -43,7 +43,7 @@ def main(args):
     print('load data')
     dataset = ReadoutDataset(args.data_path)
     loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False)
-    data_size = 5608
+    data_size = len(loader)#5608
     #for b in loader:
     #    v_in, label_in = b
     #    data_size += v_in.shape[0]
