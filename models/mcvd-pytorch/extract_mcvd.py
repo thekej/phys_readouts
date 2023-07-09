@@ -30,9 +30,9 @@ PRED_LENGTH = 4
 
 def get_dataset(args, config):
     
-    frames_per_sample = args.video_length + args.stimuli_length
+    frames_per_sample = 25#args.video_length + args.stimuli_length
     dataset = PhysionDataset(args.data_path, frames_per_sample=frames_per_sample, 
-                             image_size=config.data.image_size, train=False, random_time=True,
+                             image_size=config.data.image_size, train=False, random_time=False,
                              random_horizontal_flip=False,
                              complete=args.readout_type == 'COMPLETE',
                              simulation=args.readout_type == 'SIMULATION') #change this
@@ -90,7 +90,7 @@ def extract(args):
         #else:
         #    features_array = np.zeros((test_x.shape[0], n_features, f1, f2, f3))
         
-        real, cond, cond_mask = conditioning_fn(config, input_frames[:, :8, :, :, :], num_frames_pred=config.data.num_frames,
+        real, cond, cond_mask = conditioning_fn(config, input_frames[:, 8:16, :, :, :], num_frames_pred=config.data.num_frames,
                                             prob_mask_cond=getattr(config.data, 'prob_mask_cond', 0.0),
                                             prob_mask_future=getattr(config.data, 'prob_mask_future', 0.0))
         init = init_samples(len(real), config)
@@ -105,7 +105,7 @@ def extract(args):
         for j in range(1, n_features):
             if args.readout_type == 'SIMULATION':
                 if 4*j < args.stimuli_length:
-                    real, cond, cond_mask = conditioning_fn(config, input_frames[:, 4*j:4*j+8, :, :, :], 
+                    real, cond, cond_mask = conditioning_fn(config, input_frames[:, 8+4*j:4*j+16, :, :, :], 
                                                         num_frames_pred=config.data.num_frames,
                                             prob_mask_cond=getattr(config.data, 'prob_mask_cond', 0.0),
                                             prob_mask_future=getattr(config.data, 'prob_mask_future', 0.0))
