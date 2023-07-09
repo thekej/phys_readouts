@@ -36,7 +36,7 @@ def encode_image(x, model, state):
 
     return out
 
-def process_video(video_file, video_length, return_length_only=False):
+def process_video(video_file, video_length, return_length_only=False, original_fps=100, new_fps=25):
     try:
         with h5py.File(video_file, 'r') as f: # load ith hdf5 file from list
             frames = list(f['frames'])
@@ -50,6 +50,8 @@ def process_video(video_file, video_length, return_length_only=False):
             images = []
         
             for i, frame in enumerate(frames):
+                if not i % (original_fps // new_fps) == 0:
+                    continue
                 img = f['frames'][frame]['images']['_img_cam0'][:]
                 img = Image.open(io.BytesIO(img)) # (256, 256, 3)
                 pil_image = img.resize((128, 128), Image.LANCZOS) 
@@ -70,7 +72,7 @@ def main(args):
     videos = glob.glob(os.path.join(args.data_dir, "**/*.hdf5"))
     corrupt = glob.glob(os.path.join(args.data_dir, '**/temp.hdf5'))
     videos = list(set(videos) - set(corrupt))
-    vid_len = 50
+    vid_len = 25
     
     f = h5py.File(args.save_path, "w")
     dset1 = f.create_dataset("video", (len(videos), vid_len, 16, 16), dtype='f')

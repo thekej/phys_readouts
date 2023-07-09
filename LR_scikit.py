@@ -103,12 +103,13 @@ def train(args):
     else:
         scenario_feature = args.scenario
     X = load_hdf5(args.data_path, scenario_feature, indices)
-    if args.scenario_name in ['observed_gamma', 'observed_beta', 'observed_mcvd_ucf']:
+    if args.scenario_name in ['observed_gamma', 'observed_beta', 'observed_teco_h',  'observed_mcvd_ucf']:
         X = X[:, 0]
-    elif args.scenario_name in ['observed_teco', 'observed_fitvid', 'observed_ego4d_fitvid']:
+    elif args.scenario_name in ['observed_fitvid', 'observed_ego4d_fitvid']:
         print(X.shape)
         X = X[:, :7]
-        print(X.shape)
+    elif 'teco' in args.scenario_name and args.scenario_name != 'observed_teco_h':
+        X = X[:, 1:14]
     X = X.reshape(X.shape[0], -1)
     y = load_hdf5(args.data_path, 'label', indices)
     print(X.shape)
@@ -145,10 +146,12 @@ def train(args):
     
     #
     test_data = load_hdf5(args.test_path, scenario_feature)
-    if args.scenario_name in ['observed_gamma', 'observed_beta', 'observed_mcvd_ucf']:
+    if args.scenario_name in ['observed_gamma', 'observed_beta', 'observed_mcvd_ucf' , 'observed_teco_h']:
         test_data = test_data[:, 0]
-    elif args.scenario_name in ['observed_teco', 'observed_fitvid', 'observed_ego4d_fitvid']:
+    elif args.scenario_name in ['observed_fitvid', 'observed_ego4d_fitvid']:
         test_data = test_data[:, :7]
+    elif 'teco' in args.scenario_name and args.scenario_name != 'observed_teco_h':
+        test_data = test_data[:, 1:14]
     test_label = load_hdf5(args.test_path, 'label')
     result = test_model(grid_search, test_data, test_label, args, result)
     

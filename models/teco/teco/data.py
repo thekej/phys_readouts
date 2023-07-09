@@ -25,14 +25,20 @@ def load_hdf5(config, split='train'):
             if split == 'train':
                 split_size = int(0.9* hf['label'].shape[0])
                 video = hf['video'][:split_size]
-                actions = actions = np.zeros((video.shape[0],), dtype=np.int32)#hf['actions'][:]
+                actions = np.zeros((video.shape[0],), dtype=np.int32)#hf['actions'][:]
                 label = hf['label'][:split_size]
                 print('Train Dataset size:', split_size)
-            else:
+            elif split == 'test':
                 split_size = int(0.9* hf['label'].shape[0])
                 video = hf['video'][split_size:]
-                actions = actions = np.zeros((video.shape[0],), dtype=np.int32)#hf['actions'][:]
+                actions = np.zeros((video.shape[0],), dtype=np.int32)#hf['actions'][:]
                 label = hf['label'][split_size:]
+                print('Test Dataset size:', video.shape[0])
+            else:
+                
+                video = hf['video'][:]
+                actions = np.zeros((video.shape[0],), dtype=np.int32)#hf['actions'][:]
+                label = hf['label'][:]
                 print('Test Dataset size:', video.shape[0])
         return video, actions, label
 
@@ -162,7 +168,8 @@ class Data:
             ds_shard_id = jax.process_index()
 
         batch_size = self.config.batch_size // num_ds_shards
-        split_name = 'train' if train else 'test'
+        #split_name = 'train' if train else 'test'
+        split_name = 'extract'
 
         if not is_tfds_folder(self.config.data_path):
             if 'dmlab' in self.config.data_path:

@@ -121,7 +121,7 @@ def sample(sample_model, state, video, actions, seed=0, state_spec=None):
     return samples, video 
 
 # ONLY used for past
-def readout_h_run(sample_model, state, video, actions, seed=0, state_spec=None, seq_len=45):
+def readout_h_run(sample_model, state, video, actions, seed=0, state_spec=None, seq_len=50):
     global model
     model = sample_model
 
@@ -136,11 +136,7 @@ def readout_h_run(sample_model, state, video, actions, seed=0, state_spec=None, 
 
     assert video.shape[0] == num_local_data, f'{video.shape}, {num_local_data}'
 
-    if not model.config.use_actions:
-        if actions is None:
-            actions = jnp.zeros(video.shape[:3], dtype=jnp.int32)
-        else:
-            actions = jnp.zeros_like(actions)
+    actions = jnp.zeros(video.shape[:3], dtype=jnp.int32)
     
     if video.shape[0] < jax.local_device_count():
         devices = jax.local_devices()[:video.shape[0]]
@@ -163,12 +159,13 @@ def readout_h_run(sample_model, state, video, actions, seed=0, state_spec=None, 
         
     cond, zs = p_observe(state, encodings)
     act = actions[:, :, :seq_len]
+    print(actions.shape, act.shape)
     readout_embed = p_imagine(state, zs, act, cond, rngs)
 
     return readout_embed 
 
 def readout_z_run(sample_model, state, video, actions, seed=0, state_spec=None, 
-                  scenario='complete', seq_len=45, open_loop_ctx=7):
+                  scenario='complete', seq_len=50, open_loop_ctx=12):
     global model
     model = sample_model
 
@@ -183,12 +180,8 @@ def readout_z_run(sample_model, state, video, actions, seed=0, state_spec=None,
 
     assert video.shape[0] == num_local_data, f'{video.shape}, {num_local_data}'
 
-    if not model.config.use_actions:
-        if actions is None:
-            actions = jnp.zeros(video.shape[:3], dtype=jnp.int32)
-        else:
-            actions = jnp.zeros_like(actions)
-    
+    actions = jnp.zeros(video.shape[:3], dtype=jnp.int32)
+    print(actions.shape, 'test')
     if video.shape[0] < jax.local_device_count():
         devices = jax.local_devices()[:video.shape[0]]
     else:
@@ -219,6 +212,7 @@ def readout_z_run(sample_model, state, video, actions, seed=0, state_spec=None,
     itr = list(range(open_loop_ctx, seq_len))
     for i in tqdm(itr):
         act = actions[:, :, :seq_len]
+        print(act.shape)
         r, z, h, rngs = p_imagine(state, zs, act, cond, i, rngs)
         z_hats.append(jax.numpy.asarray(z))
         hs.append(jax.numpy.asarray(h))

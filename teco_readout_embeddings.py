@@ -108,10 +108,10 @@ if __name__ == '__main__':
     parser.add_argument('--embeddings', type=str, required=True)
     parser.add_argument('--scenario', type=str, default='past', required=True)
     parser.add_argument('--batch_size', type=int, default=64)
-    parser.add_argument('--seq_len', type=int, choices=[25, 42])
+    parser.add_argument('--seq_len', type=int, choices=[25, 42, 50])
     parser.add_argument('--open_loop_ctx', type=int, default=7)
     parser.add_argument('--seed', type=int, default=0)
-    parser.add_argument('--size', type=int, choices=[1120, 10551])
+    parser.add_argument('--size', type=int)
     args = parser.parse_args()
 
     main(args)
