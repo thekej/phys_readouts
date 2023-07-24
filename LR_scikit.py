@@ -45,6 +45,24 @@ def one_scenario_eval(args, model, data, target, scenario, result, indices):
         writer = csv.writer(file)
         writer.writerows(results)
     return result
+
+
+def all_scenario_eval(args, model, data, target, scenario, result, indices, results):
+    with open(args.test_scenario_map, 'r') as f:
+        stimulus_ = json.load(f)
+        stimulus = {v: k for k, v in stimulus_.items()}
+        
+    accuracy = model.score(data, target)
+    result[scenario+'_test'] = accuracy
+    print(f"Accuracy on %s test data (%d data points): {accuracy:.4f}"%(scenario, target.shape[0]))
+    probs = model.predict_proba(data)
+    preds = model.predict(data)
+    for i in range(target.shape[0]):
+        entry = ['all', scenario, float(result['train']), float(result[scenario+'_test']),
+                 args.scenario_name, float(probs[i][0]), float(probs[i][1]), int(preds[i]),
+                 int(target[i]), stimulus[indices[i]]]
+        results.append(entry)
+    return result, results
     
 
 def test_model(model, test_data, test_label, args, result):
@@ -54,18 +72,36 @@ def test_model(model, test_data, test_label, args, result):
         print(f"Accuracy on full test data: {accuracy:.4f}")
         result['full_test'] = accuracy
         scenarios_indices = json.load(f)
+        
+        results = [['Readout Train Data', 'Readout Test Data', 'Train Accuracy', 
+              'Test Accuracy', 'Readout Type', 'Predicted Prob_false', 
+              'Predicted Prob_true', 'Predicted Outcome', 'Actual Outcome', 
+              'Stimulus Name']]
+        
         for sc in scenarios_indices.keys():
-            if args.one_scenario is not None:
+            if args.one_scenario is not None and args.one_scenario != 'all':
                 ind = sorted(scenarios_indices[args.one_scenario])
                 data, target = test_data[ind], test_label[ind]
                 result = one_scenario_eval(args, model, data, target, 
                                   args.one_scenario, result, ind)
                 break
+            elif args.one_scenario == 'all':
+                ind = sorted(scenarios_indices[sc])
+                data, target = test_data[ind], test_label[ind]
+                result, results = all_scenario_eval(args, model, data, target, 
+                                  sc, result, ind,
+                                             results)
             else:
                 ind = sorted(scenarios_indices[sc])
                 accuracy = model.score(test_data[ind], test_label[ind])
                 result[sc+'_test'] = accuracy
                 print(f"Accuracy on %s test data: {accuracy:.4f}"%sc)
+        if args.one_scenario == 'all':
+            filename = args.data_type+'_'+ args.model_type + '_' +args.scenario_name+ \
+            '_only_'+str(args.one_scenario)+'_results.csv'
+            with open(filename, 'w', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerows(results)
     return result
             
 def get_indices(scenarios_indices):
@@ -91,7 +127,7 @@ def train(args):
             indices = list(set(indices) - set(banned_scenario))
             print('Removing %d datapoints from the %s scenario'%(len(banned_scenario),
                                                                  args.all_but_one))
-    if args.one_scenario is not None:
+    if args.one_scenario is not None and args.one_scenario != 'all':
         with open(args.train_scenario_indices, 'r') as f:
             scenarios_indices = json.load(f)
             indices = scenarios_indices[args.one_scenario]
@@ -118,7 +154,7 @@ def train(args):
     # Define the hyperparameter grid to search
     print('Load model')
     if args.model_type == 'logistic':
-        param_grid = {'clf__C': np.array([0.0001, 0.001, 0.01, 0.1, 1, 5, 20, 50]), 'clf__penalty': ['l2']}#  np.logspace(-1, 3, 5), 'clf__penalty': ['l2']}
+        param_grid = {'clf__C': np.array([50]), 'clf__penalty': ['l2']}#  np.logspace(-1, 3, 5), 'clf__penalty': ['l2']}
         model = LogisticRegression(max_iter=20000)
     elif args.model_type == 'svc':
         param_grid = {'clf__C': np.logspace(-3, 0, 4), 'clf__loss': ['hinge']}
@@ -193,7 +229,7 @@ def main():
                         help='in case of all-but-one scenario')
     parser.add_argument('--one-scenario', type=str, default=None,
                         choices=['collision', 'domino', 'link', 'towers', 
-                                 'contain', 'drop', 'roll'],
+                                 'contain', 'drop', 'roll', 'all'],
                         help='in case of all-but-one scenario')
     parser.add_argument('--balanced-indices', type=str, default=None, 
                         help='path for scenario mapping')
