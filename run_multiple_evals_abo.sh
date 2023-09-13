@@ -39,7 +39,10 @@ exp_dir="/ccn2/u/rmvenkat/data/bbnet_ablations/"
 
 #folder_names="OurMasking_1399 OurMasking_1699 OurMasking_1999 OurMasking_3279 MagViT_masking_1399 MagViT_masking_1699 MagViT_masking_3279 MagViT_masking_1999 MaskViT_masking_1399 MaskViT_masking_1699 MaskViT_masking_1999 MaskViT_masking_3279"
 
-folder_names="OurMasking_1399_more_unroll OurMasking_1699_more_unroll OurMasking_1999_more_unroll OurMasking_3279_more_unroll OurMasking_2599_more_unroll MagViT_masking_1399_more_unroll MagViT_masking_1699_more_unroll MagViT_masking_3279_more_unroll MagViT_masking_2599_more_unroll MagViT_masking_1999_more_unroll MaskViT_masking_1399_more_unroll MaskViT_masking_1699_more_unroll MaskViT_masking_1999_more_unroll MaskViT_masking_3279_more_unroll MaskViT_masking_2599_more_unroll"
+#folder_names="OurMasking_1699 MagViT_masking_1699 MaskViT_masking_1699"
+
+folder_names="OurMasking_1399 MagViT_masking_1399 MaskViT_masking_1399 OurMasking_1999 MagViT_masking_1999 MaskViT_masking_1999"
+
 
 #folder_names="MagViT_masking_3279_ocd "
 #
@@ -47,10 +50,20 @@ folder_names="OurMasking_1399_more_unroll OurMasking_1699_more_unroll OurMasking
 #
 #folder_names="MaskViT_masking_1699_ocd "
 
-suffix="_avg_features_more_unroll"
+suffix="_avg_features"
 
-for folder_name in $folder_names; do
-  cmd="python LR_scikit.py --model-type logistic --data-path $exp_dir/$folder_name/train_features.hdf5 --data-type $folder_name$suffix --test-path $exp_dir/$folder_name/test_features.hdf5 --scenario-name observed --train-scenario-indices $exp_dir/$folder_name/train_json.json --test-scenario-indices $exp_dir/$folder_name/test_json.json --scenario features --test-scenario-map /ccn2/u/thekej/R3M_readout/test_map.json --one-scenario all"
-  echo $cmd
-  eval $cmd
+#for folder_name in $folder_names; do
+#  cmd="python LR_scikit.py --model-type logistic --data-path $exp_dir/$folder_name/train_features.hdf5 --data-type $folder_name$suffix --test-path $exp_dir/$folder_name/test_features.hdf5 --scenario-name observed --train-scenario-indices $exp_dir/$folder_name/train_json.json --test-scenario-indices $exp_dir/$folder_name/test_json.json --scenario features --test-scenario-map /ccn2/u/thekej/R3M_readout/test_map.json --one-scenario all"
+#  echo $cmd
+#  eval $cmd
+#done
+
+all_scenarios="collide dominoes drop link roll support contain"
+
+for scenario in $all_scenarios; do
+  for folder_name in $folder_names; do
+    cmd="python LR_scikit.py --model-type logistic --data-path $exp_dir/$folder_name/train_features.hdf5 --data-type $folder_name$suffix --test-path $exp_dir/$folder_name/test_features.hdf5 --scenario-name observed --train-scenario-indices $exp_dir/$folder_name/train_json.json --test-scenario-indices $exp_dir/$folder_name/test_json.json --scenario features --test-scenario-map /ccn2/u/thekej/R3M_readout/test_map.json --one-scenario all --all-but-one $scenario"
+    echo $cmd
+    eval $cmd
+done
 done

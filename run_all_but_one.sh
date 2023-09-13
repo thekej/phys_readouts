@@ -6,7 +6,6 @@ for scenario in $all_scenarios; do
 
   cmd="$cmd $scenario"
 
-
   cmd_tmux="tmux kill-session -t $scenario"
   echo $cmd_tmux
   eval " $cmd_tmux"

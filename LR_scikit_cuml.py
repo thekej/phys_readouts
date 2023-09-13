@@ -6,6 +6,8 @@ import h5py
 import numpy as np
 
 import cupy as cp
+import cudf as cd
+
 from sklearn.datasets import make_classification
 from cuml.linear_model import LogisticRegression
 from cuml.svm import SVC
@@ -152,23 +154,31 @@ def train(args):
         # breakpoint()
 
     X = X.reshape(X.shape[0], -1)
+    y = load_hdf5(args.data_path, 'label', indices)
 
-    X = cp.array(X)
+    # X = cp.asarray(X)
 
     # Scale the data
     scaler = StandardScaler()
-    X = scaler.fit_transform(X)
+    # breakpoint()
+    # X = scaler.fit_transform(X)
 
-    y = load_hdf5(args.data_path, 'label', indices)
-    y = cp.array(y)
+    # y = cp.asarray(y)
+
+    # cp.cuda.Stream().synchronize()
+
+    # gdf_X = cd.DataFrame(X)
+    # gdf_y = cd.DataFrame(y)
+
+    # breakpoint()
+
     print(X.shape)
 
 
     # Define the hyperparameter grid to search
     print('Load model')
 
-    param_grid = {'clf__C': np.array([1e-5, 0.01, 0.1]),
-                  'clf__penalty': ['l2']}  # np.logspace(-1, 3, 5), 'clf__penalty': ['l2']}
+    param_grid = {'C': np.array([1e-5, 0.01, 0.1])}  # np.logspace(-1, 3, 5), 'clf__penalty': ['l2']}
     model = LogisticRegression(max_iter=20000)
 
 
@@ -176,8 +186,8 @@ def train(args):
     print('Grid Search with KFold')
     import time
     t = time.time()
-    stratified_kfold = StratifiedKFold(n_splits=5, shuffle=True, random_state=args.random_state)
-    grid_search = GridSearchCV(model, param_grid, cv=stratified_kfold, verbose=3)
+    # stratified_kfold = StratifiedKFold(n_splits=5, shuffle=True, random_state=args.random_state)
+    grid_search = GridSearchCV(model, param_grid, n_jobs=1, verbose=3)
     grid_search.fit(X, y)
     print(time.time()-t)
     # Print the best hyperparameters found by the grid search
@@ -193,7 +203,7 @@ def train(args):
     test_data = load_hdf5(args.test_path, scenario_feature)
     test_data = test_data.reshape(test_data.shape[0], -1)
     test_data = cp.array(test_data)
-    test_data = scaler.transform(test_data)
+    # test_data = scaler.transform(test_data)
 
     if args.scenario_name in ['observed_gamma', 'observed_beta', 'observed_mcvd_ucf' , 'observed_teco_h']:
         test_data = test_data[:, 0]
