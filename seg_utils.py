@@ -102,7 +102,7 @@ def get_object_masks(seg_imgs, seg_colors, background=True):
 
 class Physion(Dataset):
 
-    def __init__(self, hdf5_path, gaps=[0, 450], shp=224, pad=30, transform=None, \
+    def __init__(self, hdf5_path, gaps=[0, 450], shp=224, pad=11, transform=None, \
                  mask_per_object=False, \
                  index_start=None, \
                  full_video=True, \
@@ -120,6 +120,7 @@ class Physion(Dataset):
         elif phase == 'val':
             features = features[int(perc * len(features)):]
             filenames = filenames[int(perc * len(filenames)):]
+            pad = None
 
         self.all_hdf5 = filenames  # [:2]
 
@@ -137,7 +138,7 @@ class Physion(Dataset):
 
         self.transform = transform
 
-        self.background = True
+        self.background = False
 
         self.gaps = np.array(gaps)
 
@@ -229,16 +230,18 @@ class Physion(Dataset):
 
         # breakpoint()
 
-        ret['obj_masks'] = obj_masks[:, :, 0].transpose([1, 0, 2, 3])
+        ret['obj_masks'] = obj_masks[:, 1:, 0].transpose([1, 0, 2, 3])
 
         ret['obj_masks'] = resize(ret['obj_masks'],
                                   (ret['obj_masks'].shape[0], ret['obj_masks'].shape[1], self.shp, self.shp))
 
-        if ret['obj_masks'].shape[0] < self.pad:
-            ret['obj_masks'] = \
-                np.concatenate([ret['obj_masks'], \
-                                np.zeros([self.pad - ret['obj_masks'].shape[0], *ret['obj_masks'].shape[1:]]).astype(
-                                    'bool')])
+        if self.pad is not None:
+
+            if ret['obj_masks'].shape[0] < self.pad:
+                ret['obj_masks'] = \
+                    np.concatenate([ret['obj_masks'], \
+                                    np.zeros([self.pad - ret['obj_masks'].shape[0], *ret['obj_masks'].shape[1:]]).astype(
+                                        'bool')])
 
         ret['video_ts'] = timestamps
 
@@ -373,13 +376,24 @@ def compute_mean_iou_over_dataset(dataloader, model, upsample_size, size, dir_sa
 
             # Targets
         obj_mask = torch.tensor(batch['obj_masks']).float().squeeze(2)
+
+
+
+        obj_mask = [x for x in obj_mask[0] if x.sum() > 0]
+
+        if len(obj_mask) == 0:
+            continue
+
+        obj_mask = torch.stack(obj_mask).unsqueeze(0)
+
+        # breakpoint()
         target = F.interpolate(obj_mask.cuda(), size=size, mode='nearest').flatten(2, 3)  # [B, M, hw]
 
         # Decode
         logit = model(feature).permute(0, 3, 1, 2).flatten(2, 3)  # [B, N, hw]
-        pred = logit.sigmoid().argmax(1)
-        unique = pred.unique().view(1, -1, 1)
-        pred = (pred[:, None] == unique).float()
+        pred = (logit>0).float() #logit.sigmoid().argmax(1)
+        # unique = pred.unique().view(1, -1, 1)
+        # pred = (pred[:, None] == unique).float()
 
         assert pred.shape[0] == 1, "only implement for batch size 1"
 
@@ -395,7 +409,9 @@ def compute_mean_iou_over_dataset(dataloader, model, upsample_size, size, dir_sa
         mean_iou = iou_list.mean()
         mean_iou_list.append(mean_iou.detach().cpu().numpy())
 
-        if i <= 15:
+        # breakpoint()
+
+        if i <= 5:
 
             batch_idx = 0
             fig, axs = plt.subplots(2, match_idx.shape[-1], figsize=(10, 3))
@@ -413,5 +429,7 @@ def compute_mean_iou_over_dataset(dataloader, model, upsample_size, size, dir_sa
 
             plt.savefig(os.path.join(dir_save_images, f'{i}.png'))
             plt.close()
+
+    # breakpoint()
 
     return np.mean(mean_iou_list)

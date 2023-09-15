@@ -69,13 +69,13 @@ test_loader = MultiEpochsDataLoader(physion_test_datset, batch_size=1, shuffle=F
 h_, w_ = physion_train_datset[0]['feature'].shape[:2]
 
 # Define the decoder MLP
-num_predicted_masks = 10
+num_predicted_masks = 11
 num_hidden_layers = 1
 hidden_dim = 64
 feature_dim = physion_train_datset.all_features[0].shape[-1]
-val_after = 5
+val_after = 1
 
-lr_list = [1e-5] # [1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
+lr_list = [1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
 
 num_epochs = 1000
 
