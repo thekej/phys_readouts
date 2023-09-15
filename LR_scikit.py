@@ -75,6 +75,8 @@ def load_hdf5(file_path, dataset_name, indices=None):
         else:
             dataset = file[dataset_name][sorted(indices)]
 
+    #save stimulus map here if it doesn't exist.
+
     # if dataset_name != 'label':
     #     dataset = dataset.mean(axis=-2)
 
@@ -100,6 +102,8 @@ def balance_data(X, y):
 #             f.create_dataset('label', data=label)
 
 def load_save_hdf5(file_path, include=True):
+
+    #save this in same folder as hdf5 file
 
     # breakpoint()
 
@@ -160,6 +164,8 @@ def load_save_hdf5(file_path, include=True):
         json_path = file_path.split('.')[-2] + '_temp.json'
         with open(json_path, 'w') as json_file:
             json.dump(all_scenarios, json_file)
+
+        #save stimulus map: filename -> index for csv
 
     return data_path, json_path
 
