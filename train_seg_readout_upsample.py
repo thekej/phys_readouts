@@ -30,6 +30,17 @@ import torch
 from seg_utils import *
 
 
+dir_save_images_val = '/'.join(args.train_features_hdf5.split('/')[:-1]) + '/val_images/'
+
+if not os.path.exists(dir_save_images_val):
+    os.makedirs(dir_save_images_val)
+
+dir_save_images_test = '/'.join(args.train_features_hdf5.split('/')[:-1]) + '/test_images/'
+
+if not os.path.exists(dir_save_images_test):
+    os.makedirs(dir_save_images_test)
+
+
 
 #command to run this script
 #python train_seg_readout.py --train_features_hdf5 /ccn2/u/rmvenkat/data/test_with_keypoint_model_3_feats/M4/train_features.hdf5 --test_features_hdf5 /ccn2/u/rmvenkat/data/test_with_keypoint_model_3_feats/M4/test_features.hdf5 --feature_dim 256 --model_type CWM
@@ -62,9 +73,9 @@ num_predicted_masks = 10
 num_hidden_layers = 1
 hidden_dim = 64
 feature_dim = physion_train_datset.all_features[0].shape[-1]
-val_after = 1
+val_after = 5
 
-lr_list = [1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
+lr_list = [1e-5] # [1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
 
 num_epochs = 1000
 
@@ -75,7 +86,7 @@ upsample_size = (upsample_size, upsample_size)
 
 kernel_size = int(size[0] // upsample_size[0])
 
-convergence_thresh = 10
+convergence_thresh = 20
 
 overall_best_iou = 0
 
@@ -94,6 +105,7 @@ class ReadoutModel(torch.nn.Module):
         self.decoder = torch.nn.Sequential(*decoder_layers)
 
     def forward(self, feature):
+        feature = feature.float()
         feature = self.upconv(feature).permute(0, 2, 3, 1)
         logit = self.decoder(feature)
         return logit
@@ -151,7 +163,7 @@ for lr in lr_list:
         print('time:', time.time() - t, f'Epoch:{epoch_num}, Train loss:{loss.item():.5f}')
 
         if epoch_num % val_after == 0:
-            mean_iou = compute_mean_iou_over_dataset(val_loader, model, upsample_size, size, permute=False)
+            mean_iou = compute_mean_iou_over_dataset(val_loader, model, upsample_size, size, dir_save_images_val, permute=False)
             print(f'Epoch:{epoch_num}, Val Mean IoU:{mean_iou:.5f}', 'loss:', loss.item())
             if mean_iou > best_val_iou:
                 counter_converge = 0
@@ -170,7 +182,7 @@ for lr in lr_list:
 
 model.load_state_dict(torch.load('linear_decoder.pt'))
 
-test_iou = compute_mean_iou_over_dataset(test_loader, model, size, permute=False)
+test_iou = compute_mean_iou_over_dataset(test_loader, model, upsample_size, size, dir_save_images_test, permute=False)
 
 print(f'Test Mean IoU:{test_iou:.5f}')
 

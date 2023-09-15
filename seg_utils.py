@@ -1,11 +1,13 @@
 import io
 
+import os
 import torch.nn
 
 import h5py
 import numpy as np
 import torch
 from PIL import Image
+from matplotlib import pyplot as plt
 from skimage.transform import resize
 from torch.utils.data import Dataset
 from scipy.optimize import linear_sum_assignment
@@ -358,7 +360,7 @@ def batch_iou(inputs: torch.Tensor, targets: torch.Tensor):
 
 
     # Save model
-def compute_mean_iou_over_dataset(dataloader, model, upsample_size, size, permute=True):
+def compute_mean_iou_over_dataset(dataloader, model, upsample_size, size, dir_save_images, permute=True):
     mean_iou_list = []
     for i, batch in enumerate(dataloader):
 
@@ -381,6 +383,9 @@ def compute_mean_iou_over_dataset(dataloader, model, upsample_size, size, permut
 
         assert pred.shape[0] == 1, "only implement for batch size 1"
 
+        # dice_cost = batch_dice_loss(logit, target)
+        # f1_cost = batch_sigmoid_ce_loss(logit, target)
+
         iou_cost = batch_iou(pred, target)
 
         cost = 1 - iou_cost  # [B, N, W]
@@ -389,5 +394,24 @@ def compute_mean_iou_over_dataset(dataloader, model, upsample_size, size, permut
         iou_list = iou_cost[list(match_idx)]
         mean_iou = iou_list.mean()
         mean_iou_list.append(mean_iou.detach().cpu().numpy())
+
+        if i <= 15:
+
+            batch_idx = 0
+            fig, axs = plt.subplots(2, match_idx.shape[-1], figsize=(10, 3))
+            for j in range(match_idx.shape[-1]):
+                _, nidx, midx = match_idx[:, batch_idx, j]
+                _iou = iou_list[batch_idx, j]
+                p = pred[batch_idx, nidx].view(size[0], size[1]).cpu().detach().bool()
+                t = target[batch_idx, midx].view(size[0], size[1]).cpu().detach().bool()
+                axs[0, j].imshow(p)
+                axs[1, j].imshow(t)
+                axs[0, j].set_title(f'(iou:{_iou:.3f})')
+                axs[1, j].set_title(f'GT')
+
+            #set suptitle as the dice loss and f1 loss
+
+            plt.savefig(os.path.join(dir_save_images, f'{i}.png'))
+            plt.close()
 
     return np.mean(mean_iou_list)
