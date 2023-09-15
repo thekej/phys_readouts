@@ -358,15 +358,18 @@ def batch_iou(inputs: torch.Tensor, targets: torch.Tensor):
 
 
     # Save model
-def compute_mean_iou_over_dataset(dataloader, model, size):
+def compute_mean_iou_over_dataset(dataloader, model, upsample_size, size, permute=True):
     mean_iou_list = []
     for i, batch in enumerate(dataloader):
 
         # Features (TODO: Rahul)
         seg_color = torch.tensor(batch['feature']).squeeze(1)  # /255. # [B, H, W, 3]
-        feature = F.interpolate(seg_color.permute(0, 3, 1, 2).cuda(), size=size).permute(0, 2, 3, 1)  # [B, h, w, 3]
+        feature = F.interpolate(seg_color.permute(0, 3, 1, 2).cuda(), size=upsample_size, mode='bilinear') # [B, h, w, 3]
 
-        # Targets
+        if permute:
+            feature = feature.permute(0, 2, 3, 1)
+
+            # Targets
         obj_mask = torch.tensor(batch['obj_masks']).float().squeeze(2)
         target = F.interpolate(obj_mask.cuda(), size=size, mode='nearest').flatten(2, 3)  # [B, M, hw]
 

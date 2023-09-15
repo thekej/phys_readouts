@@ -11,8 +11,6 @@ parser.add_argument('--train_features_hdf5', type=str, default='/ccn2/u/rmvenkat
 #args for path to test features hdf5 file
 parser.add_argument('--test_features_hdf5', type=str, default='/ccn2/u/rmvenkat/data/test_with_keypoint_model_3_feats/M4/test_features.hdf5')
 
-#feature dim
-parser.add_argument('--feature_dim', type=int, default=256)
 
 #model type
 parser.add_argument('--model_type', type=str, default='CWM')
@@ -56,23 +54,26 @@ val_loader = MultiEpochsDataLoader(physion_val_datset, batch_size=1, shuffle=Fal
 
 test_loader = MultiEpochsDataLoader(physion_test_datset, batch_size=1, shuffle=False, num_workers=1)
 
-h_, w_ = physion_train_datset.all_features[0].shape[1:3]
+# breakpoint()
+h_, w_ = physion_train_datset[0]['feature'].shape[:2]
 
 # Define the decoder MLP
 num_predicted_masks = 10
 num_hidden_layers = 1
 hidden_dim = 64
-feature_dim = args.feature_dim
+feature_dim = physion_train_datset.all_features[0].shape[-1]
 val_after = 1
 
-lr_list = [1e-5]
+lr_list = [1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
 
 num_epochs = 1000
 
 size = (256, 256) # always power of 2
 
-upsample_size = size[0] // np.round(np.log2(h_))
+upsample_size = int(2**np.round(np.log2(h_)))
 upsample_size = (upsample_size, upsample_size)
+
+kernel_size = int(size[0] // upsample_size[0])
 
 convergence_thresh = 10
 
@@ -80,18 +81,29 @@ overall_best_iou = 0
 
 best_lr = lr_list[0]
 
+class ReadoutModel(torch.nn.Module):
+    def __init__(self, feature_dim, num_predicted_masks, kernel_size):
+        super(ReadoutModel, self).__init__()
+
+        self.upconv = torch.nn.ConvTranspose2d(feature_dim, 128, kernel_size=kernel_size, stride=kernel_size, padding=0)
+
+        decoder_layers = [torch.nn.ReLU()]
+
+        decoder_layers.append(torch.nn.Linear(128, num_predicted_masks))
+
+        self.decoder = torch.nn.Sequential(*decoder_layers)
+
+    def forward(self, feature):
+        feature = self.upconv(feature).permute(0, 2, 3, 1)
+        logit = self.decoder(feature)
+        return logit
+
 for lr in lr_list:
 
-    decoder_layers = [torch.nn.Linear(feature_dim, 64), torch.nn.ReLU()]
-    for i in range(num_hidden_layers):
-        decoder_layers.append(torch.nn.Linear(hidden_dim, hidden_dim))
-        decoder_layers.append(torch.nn.ReLU())
-    decoder_layers.append(torch.nn.Linear(64, num_predicted_masks))
-
-    decoder = torch.nn.Sequential(*decoder_layers).cuda()
+    model = ReadoutModel(feature_dim, num_predicted_masks, kernel_size).cuda()
 
     # Optimizer
-    optimizer = torch.optim.AdamW(decoder.parameters(), lr=lr)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
 
     # Num epochs
 
@@ -104,14 +116,16 @@ for lr in lr_list:
         for i, batch in enumerate(train_dataloader):
             # Features
             seg_color = torch.tensor(batch['feature']).squeeze(1)  # / 255. # [B, H, W, 3]
-            feature = F.interpolate(seg_color.permute(0, 3, 1, 2).cuda(), size, mode='bilinear').permute(0, 2, 3, 1).float()  # [B, h, w, 3]
+            feature = F.interpolate(seg_color.permute(0, 3, 1, 2).cuda(), upsample_size, mode='bilinear') # [B, 3, h, w]
 
             # Targets
             obj_mask = torch.tensor(batch['obj_masks']).float().squeeze(2)
             target = F.interpolate(obj_mask.cuda(), size=size, mode='nearest').flatten(2, 3)  # [B, M, hw]
 
             # Forward pass through the decoder
-            logit = decoder(feature).permute(0, 3, 1, 2).flatten(2, 3)  # [B, N, hw]
+            logit = model(feature).permute(0, 3, 1, 2).flatten(2, 3)  # [B, N, hw]
+
+            # breakpoint()
 
             # Compute pairwise cost
             valid = target.sum(-1)[:, None].expand(-1, logit.shape[1], -1) == 0
@@ -137,7 +151,7 @@ for lr in lr_list:
         print('time:', time.time() - t, f'Epoch:{epoch_num}, Train loss:{loss.item():.5f}')
 
         if epoch_num % val_after == 0:
-            mean_iou = compute_mean_iou_over_dataset(val_loader, decoder, size, size)
+            mean_iou = compute_mean_iou_over_dataset(val_loader, model, upsample_size, size, permute=False)
             print(f'Epoch:{epoch_num}, Val Mean IoU:{mean_iou:.5f}', 'loss:', loss.item())
             if mean_iou > best_val_iou:
                 counter_converge = 0
@@ -147,16 +161,16 @@ for lr in lr_list:
                     best_lr = lr
                     overall_best_iou = mean_iou
                     print(f'Saving best model with val mean IoU:{mean_iou:.5f}')
-                    torch.save(decoder.state_dict(), 'linear_decoder.pt')
+                    torch.save(model.state_dict(), 'linear_decoder.pt')
             else:
                 counter_converge += 1
 
         if counter_converge >= convergence_thresh:
             break
 
-decoder.load_state_dict(torch.load('linear_decoder.pt'))
+model.load_state_dict(torch.load('linear_decoder.pt'))
 
-test_iou = compute_mean_iou_over_dataset(test_loader, decoder, size, size)
+test_iou = compute_mean_iou_over_dataset(test_loader, model, size, permute=False)
 
 print(f'Test Mean IoU:{test_iou:.5f}')
 
