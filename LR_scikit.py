@@ -63,7 +63,7 @@ list_include = {'collide':
 
 
 
-def load_hdf5(file_path, dataset_name, indices=None):
+def load_hdf5(file_path, dataset_name, indices=None, mean=False):
 
     # breakpoint()
 
@@ -76,9 +76,11 @@ def load_hdf5(file_path, dataset_name, indices=None):
             dataset = file[dataset_name][sorted(indices)]
 
     #save stimulus map here if it doesn't exist.
-
-    # if dataset_name != 'label':
-    #     dataset = dataset.mean(axis=-2)
+    if mean:
+        if dataset_name != 'label':
+            # dataset = dataset.mean(axis=-2)
+            dataset = dataset.reshape(dataset.shape[0], 2, 64, 64, 256)
+            dataset = dataset[:, :, ::2, ::2, :]
 
     # breakpoint()
 
@@ -304,7 +306,7 @@ def train(args):
         scenario_feature = 'features_mid'
     else:
         scenario_feature = args.scenario
-    X = load_hdf5(args.data_path, scenario_feature, indices)
+    X = load_hdf5(args.data_path, scenario_feature, indices, mean=args.mean)
 
     # breakpoint()
 
@@ -332,7 +334,10 @@ def train(args):
     # Define the hyperparameter grid to search
     print('Load model')
     if args.model_type == 'logistic':
-        param_grid = {'clf__C': np.array([1e-5, 0.01, 0.1, 1, 5, 10, 20]), 'clf__penalty': ['l2']}#  np.logspace(-1, 3, 5), 'clf__penalty': ['l2']}
+        if args.ocp:
+            param_grid = {'clf__C': np.array([1e-5, 0.01, 0.1, 1]), 'clf__penalty': ['l2']}  #
+        else:
+            param_grid = {'clf__C': np.array([1e-5, 0.01, 0.1, 1, 5, 10, 20]), 'clf__penalty': ['l2']}#  np.logspace(-1, 3, 5), 'clf__penalty': ['l2']}
         # param_grid = {'clf__C': np.array([1e-5, 0.01, 0.1]),
         #               'clf__penalty': ['l2']}  # np.logspace(-1, 3, 5), 'clf__penalty': ['l2']}
         model = LogisticRegression(max_iter=20000)
@@ -361,7 +366,7 @@ def train(args):
     result['train'] = accuracy
     
     #
-    test_data = load_hdf5(args.test_path, scenario_feature)
+    test_data = load_hdf5(args.test_path, scenario_feature, mean=args.mean)
     if args.scenario_name in ['observed_gamma', 'observed_beta', 'observed_mcvd_ucf' , 'observed_teco_h']:
         test_data = test_data[:, 0]
     elif args.scenario_name in ['observed_fitvid', 'observed_ego4d_fitvid']:
@@ -429,6 +434,11 @@ def main():
 
     #save trur arg
     parser.add_argument('--balance_readout', action='store_true', default=False, help='balance dataset & use unique readouts for training')
+    parser.add_argument('--ocp', action='store_true', default=False,
+                        help='reg')
+
+    parser.add_argument('--mean', action='store_true', default=False,
+                        help='reg')
     args = parser.parse_args()
 
     train(args)

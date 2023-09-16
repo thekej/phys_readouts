@@ -29,6 +29,12 @@ import torch
 
 from seg_utils import *
 
+dir_save_weights = '/'.join(args.train_features_hdf5.split('/')[:-1]) + '/weights/'
+
+if not os.path.exists(dir_save_weights):
+    os.makedirs(dir_save_weights)
+
+model_save_path = os.path.join(dir_save_weights, 'linear_decoder.pt')
 
 dir_save_images_val = '/'.join(args.train_features_hdf5.split('/')[:-1]) + '/val_images/'
 
@@ -73,11 +79,11 @@ num_predicted_masks = 11
 num_hidden_layers = 1
 hidden_dim = 64
 feature_dim = physion_train_datset.all_features[0].shape[-1]
-val_after = 1
+val_after = 5
 
-lr_list = [1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
+lr_list = [1e-2, 1e-3, 1e-4]
 
-num_epochs = 1000
+num_epochs = 300
 
 size = (256, 256) # always power of 2
 
@@ -86,7 +92,7 @@ upsample_size = (upsample_size, upsample_size)
 
 kernel_size = int(size[0] // upsample_size[0])
 
-convergence_thresh = 20
+convergence_thresh = 4
 
 overall_best_iou = 0
 
@@ -173,14 +179,15 @@ for lr in lr_list:
                     best_lr = lr
                     overall_best_iou = mean_iou
                     print(f'Saving best model with val mean IoU:{mean_iou:.5f}')
-                    torch.save(model.state_dict(), 'linear_decoder.pt')
+
+                    torch.save(model.state_dict(), model_save_path)
             else:
                 counter_converge += 1
 
         if counter_converge >= convergence_thresh:
             break
 
-model.load_state_dict(torch.load('linear_decoder.pt'))
+model.load_state_dict(torch.load(model_save_path))
 
 test_iou = compute_mean_iou_over_dataset(test_loader, model, upsample_size, size, dir_save_images_test, permute=False)
 

@@ -414,13 +414,16 @@ def compute_mean_iou_over_dataset(dataloader, model, upsample_size, size, dir_sa
         if i <= 5:
 
             batch_idx = 0
-            fig, axs = plt.subplots(2, match_idx.shape[-1], figsize=(10, 3))
+            fig, axs = plt.subplots(2, match_idx.shape[-1], squeeze = False, figsize=(10, 3))
             for j in range(match_idx.shape[-1]):
                 _, nidx, midx = match_idx[:, batch_idx, j]
                 _iou = iou_list[batch_idx, j]
                 p = pred[batch_idx, nidx].view(size[0], size[1]).cpu().detach().bool()
                 t = target[batch_idx, midx].view(size[0], size[1]).cpu().detach().bool()
-                axs[0, j].imshow(p)
+                try:
+                    axs[0, j].imshow(p)
+                except:
+                    breakpoint()
                 axs[1, j].imshow(t)
                 axs[0, j].set_title(f'(iou:{_iou:.3f})')
                 axs[1, j].set_title(f'GT')
