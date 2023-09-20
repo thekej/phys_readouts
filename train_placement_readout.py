@@ -38,6 +38,33 @@ class ReadoutModel(torch.nn.Module):
         logit = logit.view(logit.size(0), -1)
 
         return logit
+    
+import torch.nn as nn
+
+class ReadoutModel(nn.Module):
+    def __init__(self, feature_dim, H, W):
+        super(ReadoutModel, self).__init__()
+
+        # Linear layer to merge the time dimension with a learnable weight for each time step
+        self.time_merge = nn.Linear(feature_dim, 1, bias=False)
+
+        # Logistic regression to produce H*W binary vector
+        self.logistic_regression = nn.Linear(H*W, H*W)
+
+    def forward(self, feature):
+        feature = feature.float()
+
+        # Merge time dimension using weighted sum
+        B, T, _, _, dim = feature.shape
+        feature = feature.view(B, T, -1, dim)  # Shape: (batch, time, H*W, dim)
+        feature = self.time_merge(feature)  # Shape: (batch, 1, H*W)
+        feature = feature.squeeze(1)  # Shape: (batch, H*W)
+        
+        # Apply logistic regression
+        logit = self.logistic_regression(feature)
+
+        return logit
+
 
 
 class SegmentationTrainer:
