@@ -106,10 +106,10 @@ class Physion(Dataset):
         with h5py.File(hdf5_path) as f:
             features = f['features'][:]
             filenames = f['filenames'][:]
-            masks = f['masks'][:]
+            roi = f['roi'][:]
         self.filenames = filenames
         self.features = features
-        self.masks = masks
+        self.roi = masks
         self.indices = indices
 
     def __len__(self):
@@ -124,9 +124,9 @@ class Physion(Dataset):
 
         filename = self.filenames[idx]
         feature = self.features[idx]
-        mask = self.masks[idx]
+        roi = self.roi[idx]
 
-        return filename, feature, mask
+        return filename, feature, roi
 
 
 def batch_dice_loss(inputs: torch.Tensor, targets: torch.Tensor):
@@ -169,6 +169,69 @@ def batch_sigmoid_ce_loss(inputs: torch.Tensor, targets: torch.Tensor):
     loss = torch.einsum("bnc,bmc->bnm", pos, targets) + torch.einsum("bnc,bmc->bnm", neg, (1 - targets))
 
     return loss / hw
+
+def batch_sigmoid_ce_loss_masked(inputs: torch.Tensor, targets: torch.Tensor, mask: torch.Tensor):
+    """
+    Args:
+        inputs: A float tensor shape [B, N, HW].
+                The predictions for each example.
+        targets: A float tensor with shape [B, M, HW]. Stores the binary
+                 classification label for each element in inputs
+                (0 for the negative class and 1 for the positive class).
+        mask: A float tensor with shape [B, HW]. Binary mask indicating
+              which indices to include (1) or ignore (0) in the loss calculation.
+    Returns:
+        Loss tensor
+    """
+    hw = inputs.shape[-1]
+
+    pos = F.binary_cross_entropy_with_logits(
+        inputs, torch.ones_like(inputs), reduction="none"
+    )
+    neg = F.binary_cross_entropy_with_logits(
+        inputs, torch.zeros_like(inputs), reduction="none"
+    )
+
+    loss = torch.einsum("bnc,bmc->bnm", pos, targets) + torch.einsum("bnc,bmc->bnm", neg, (1 - targets))
+    
+    # Applying the mask
+    loss = loss * mask.unsqueeze(1).unsqueeze(1)
+
+    return loss.sum() / mask.sum()
+
+
+def f1_score(predictions: torch.Tensor, targets: torch.Tensor, roi_mask: torch.Tensor, threshold: float = 0.0):
+    """
+    Args:
+        predictions: A float tensor of shape [B, HW] containing predictions.
+        targets: A float tensor of shape [B, HW] containing ground truth labels.
+        roi_mask: A float tensor of shape [B, HW] indicating the ROIs (1 for ROI, 0 for non-ROI).
+        threshold: A float for thresholding predictions to binary values (0 or 1).
+    
+    Returns:
+        F1 score tensor.
+    """
+    
+    # Convert predictions to binary using the threshold
+    binary_predictions = (predictions > threshold).float()
+    
+    # Mask the predictions and targets using the ROI mask
+    masked_predictions = binary_predictions * roi_mask
+    masked_targets = targets * roi_mask
+    
+    # Compute True Positives, False Positives and False Negatives
+    TP = (masked_predictions * masked_targets).sum(dim=1)
+    FP = (masked_predictions * (1 - masked_targets)).sum(dim=1)
+    FN = ((1 - masked_predictions) * masked_targets).sum(dim=1)
+    
+    # Compute Precision and Recall
+    precision = TP / (TP + FP + 1e-10)
+    recall = TP / (TP + FN + 1e-10)
+    
+    # Compute F1 Score
+    f1 = 2 * precision * recall / (precision + recall + 1e-10)
+    
+    return f1.mean()  # Return average F1 score across the batch
 
 
 def batch_hungarian_matcher(cost_matrix):
@@ -238,7 +301,7 @@ def batch_iou(inputs: torch.Tensor, targets: torch.Tensor):
 
 
     # Save model
-def compute_mean_iou_over_dataset(dataloader, model, upsample_size, size, dir_save_images, permute=True):
+def compute_mean_f1_over_dataset(dataloader, model, upsample_size, size, dir_save_images, permute=True):
     mean_iou_list = []
     for i, batch in enumerate(dataloader):
         _, features, masks = batch
@@ -252,12 +315,12 @@ def compute_mean_iou_over_dataset(dataloader, model, upsample_size, size, dir_sa
 
         # Decode
         logit = model(features.cuda()).squeeze(1)  # [B, 1, hw]
-        pred = (logit>0).float() #logit.sigmoid().argmax(1)
+        #pred = (logit>0).float() #logit.sigmoid().argmax(1)
 
         assert pred.shape[0] == 1, "only implement for batch size 1"
 
-        iou_cost = batch_iou(pred, target)
-        mean_iou_list.append(iou_cost.detach().cpu().numpy())
+        f1_cost = f1_score(logit, target, masks)
+        mean_f1_list.append(f1_cost.detach().cpu().numpy())
 
         # breakpoint()
 
@@ -265,15 +328,15 @@ def compute_mean_iou_over_dataset(dataloader, model, upsample_size, size, dir_sa
 
             batch_idx = 0
             fig, axs = plt.subplots(2, 1, squeeze = False, figsize=(10, 3))
-            _iou = mean_iou_list[batch_idx]
-            p = pred[batch_idx].view(size[0], size[1]).cpu().detach().bool()
+            _iou = mean_f1_list[batch_idx]
+            p = logit[batch_idx].view(size[0], size[1]).cpu().detach().bool() * masks
             t = target[batch_idx].view(size[0], size[1]).cpu().detach().bool()
             try:
                 axs[0, 0].imshow(p)
             except:
                 breakpoint()
             axs[1, 0].imshow(t)
-            axs[0, 0].set_title(f'(iou:{_iou:.3f})')
+            axs[0, 0].set_title(f'(f1:{f_1_cost:.3f})')
             axs[1, 0].set_title(f'GT')
 
             #set suptitle as the dice loss and f1 loss

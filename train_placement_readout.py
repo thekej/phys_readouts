@@ -7,7 +7,7 @@ from utils.segmentation_helper import *
     
     
 class ReadoutModel(torch.nn.Module):
-    def __init__(self, feature_dim, num_predicted_masks, kernel_size):
+    def __init__(self, feature_dim, kernel_size):
         super(ReadoutModel, self).__init__()
 
         # Add a 3D Conv to merge the time dimension
@@ -18,7 +18,7 @@ class ReadoutModel(torch.nn.Module):
                                                stride=kernel_size, padding=0)
 
         decoder_layers = [torch.nn.ReLU()]
-        decoder_layers.append(torch.nn.Linear(128, num_predicted_masks))
+        decoder_layers.append(torch.nn.Linear(128, 1))
 
         self.decoder = torch.nn.Sequential(*decoder_layers)
 
@@ -38,33 +38,6 @@ class ReadoutModel(torch.nn.Module):
         logit = logit.view(logit.size(0), -1)
 
         return logit
-    
-import torch.nn as nn
-
-class ReadoutModel(nn.Module):
-    def __init__(self, feature_dim, H, W):
-        super(ReadoutModel, self).__init__()
-
-        # Linear layer to merge the time dimension with a learnable weight for each time step
-        self.time_merge = nn.Linear(feature_dim, 1, bias=False)
-
-        # Logistic regression to produce H*W binary vector
-        self.logistic_regression = nn.Linear(H*W, H*W)
-
-    def forward(self, feature):
-        feature = feature.float()
-
-        # Merge time dimension using weighted sum
-        B, T, _, _, dim = feature.shape
-        feature = feature.view(B, T, -1, dim)  # Shape: (batch, time, H*W, dim)
-        feature = self.time_merge(feature)  # Shape: (batch, 1, H*W)
-        feature = feature.squeeze(1)  # Shape: (batch, H*W)
-        
-        # Apply logistic regression
-        logit = self.logistic_regression(feature)
-
-        return logit
-
 
 
 class SegmentationTrainer:
@@ -133,21 +106,22 @@ class SegmentationTrainer:
             for epoch_num in range(self.num_epochs):
                 t = time.time()
                 for i, batch in enumerate(self.train_dataloader):
-                    _, features, masks = batch
+                    _, features, masks, roi_matrix = batch
                     # Features
                     features = resize_tensor(features, size)
                     
                     # Targets
                     masks = torch.tensor(masks).float()
-                    target = F.interpolate(masks.cuda(), size=size, mode='nearest').squeeze(1).flatten(2, 3)  # [B, M, hw]
+                    target = F.interpolate(masks.cuda(), size=size, mode='nearest').flatten(2, 3)  # [B, hw]
 
                     # Forward pass through the decoder
-                    logit = model(feature).squeeze(1)    # [B, 1, hw]
+                    logit = model(feature)    # [B, hw]
 
                     # breakpoint()
-                    dice_cost = batch_dice_loss(logit, target)
-                    f1_cost = batch_sigmoid_ce_loss(logit, target)
-                    loss = dice_cost + f1_cost  # [B, N, W]
+                    #dice_cost = batch_dice_loss(logit, target)
+                    #f1_cost = batch_sigmoid_ce_loss(logit, target)
+                    masked_f1_cost = batch_sigmoid_ce_loss(logit, target, roi_matrix)
+                    loss = masked_f1_cost
 
                     # Optimize
                     optimizer.zero_grad()
@@ -161,14 +135,14 @@ class SegmentationTrainer:
     def evaluate(self):
         model = ReadoutModel(self.feature_dim, self.num_predicted_masks, self.kernel_size).cuda()
         model.load_state_dict(torch.load(self.model_save_path))
-        test_iou = compute_mean_iou_over_dataset(self.test_loader, model, 
+        test_f1 = compute_mean_f1_over_dataset(self.test_loader, model, 
                                                  self.upsample_size, self.size, 
                                                  self.dir_save_images_test, permute=False)
-        return test_iou
+        return test_f1
 
-    def save_results(self, test_iou):
+    def save_results(self, test_f1):
         with open(self.args.model_type + '_.txt', 'w') as fileo:
-            fileo.write('Test Mean IoU:' + str(test_iou))
+            fileo.write('Test Mean F1:' + str(test_f1))
             fileo.write('Best lr:' + str(self.best_lr))
 
 
