@@ -110,8 +110,18 @@ class Physion(Dataset):
                  get_label=False, phase='train', perc=0.9):
 
         with h5py.File(hdf5_path) as f:
-            features = f['features'][:, 0]
-            filenames = f['filenames'][:]
+            features = f['features'][...]#[:200]
+            # breakpoint()
+            # if features.shape[1] == 4:
+            #     features = features[:, 2]
+            # elif features.shape[1] == 2:
+            #     shp = features.shape[2]
+            #     features = features[:, 0, :shp//2]
+            # elif features.shape[1] == 1:
+            #     shp = features.shape[2]//4
+            #     features = features[:, 0, :shp]
+
+            filenames = f['filenames'][:]#[:200]
         #             print(filenames)
 
         if phase == 'train':
@@ -159,9 +169,9 @@ class Physion(Dataset):
 
         features = self.all_features[idx]
 
-        n_patches = np.sqrt(features.shape[0]).astype('int')
-
-        features = features.reshape(n_patches, n_patches, -1)
+        # n_patches = np.sqrt(features.shape[0]).astype('int')
+        #
+        # features = features.reshape(n_patches, n_patches, -1)
 
         # print()
         # print(filename)
@@ -363,12 +373,16 @@ def batch_iou(inputs: torch.Tensor, targets: torch.Tensor):
 
 
     # Save model
-def compute_mean_iou_over_dataset(dataloader, model, upsample_size, size, dir_save_images, permute=True):
+def compute_mean_iou_over_dataset(dataloader, model, upsample_size, size, dir_save_images, permute=True, avg=False):
     mean_iou_list = []
+    all_filenames = []
+    all_scenarios_mious = {'collide': [], 'drop': [], 'support': [], 'link': [], 'roll': [], 'contain': [], 'dominoes': []}
     for i, batch in enumerate(dataloader):
 
+        all_filenames.append(batch['filename'])
+
         # Features (TODO: Rahul)
-        seg_color = torch.tensor(batch['feature']).squeeze(1)  # /255. # [B, H, W, 3]
+        seg_color = torch.tensor(batch['feature'])#.squeeze(1)  # /255. # [B, H, W, 3]
         feature = F.interpolate(seg_color.permute(0, 3, 1, 2).cuda(), size=upsample_size, mode='bilinear') # [B, h, w, 3]
 
         if permute:
@@ -376,8 +390,6 @@ def compute_mean_iou_over_dataset(dataloader, model, upsample_size, size, dir_sa
 
             # Targets
         obj_mask = torch.tensor(batch['obj_masks']).float().squeeze(2)
-
-
 
         obj_mask = [x for x in obj_mask[0] if x.sum() > 0]
 
@@ -408,6 +420,11 @@ def compute_mean_iou_over_dataset(dataloader, model, upsample_size, size, dir_sa
         iou_list = iou_cost[list(match_idx)]
         mean_iou = iou_list.mean()
         mean_iou_list.append(mean_iou.detach().cpu().numpy())
+        filename = batch['filename'][0]
+
+        for key in all_scenarios_mious.keys():
+            if key + '_all_movies' in str(filename):
+                all_scenarios_mious[key].append(mean_iou.detach().cpu().numpy())
 
         # breakpoint()
 
@@ -434,5 +451,9 @@ def compute_mean_iou_over_dataset(dataloader, model, upsample_size, size, dir_sa
             plt.close()
 
     # breakpoint()
-
-    return np.mean(mean_iou_list)
+    for key in all_scenarios_mious.keys():
+        all_scenarios_mious[key] = np.mean(all_scenarios_mious[key])
+    if avg:
+        return np.mean(mean_iou_list)
+    else:
+        return mean_iou_list, all_filenames, all_scenarios_mious

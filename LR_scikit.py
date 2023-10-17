@@ -1,5 +1,7 @@
 import argparse
 import csv
+import os.path
+
 import joblib
 import json
 import h5py
@@ -62,24 +64,116 @@ list_include = {'collide':
 'pilot_towers_nb4_fr015_SJ000_gr000sph_mono1_dis0_occ0_tdwroom_stable'] }
 
 
+buggy_stims = "pilot-containment-cone-plate_0017 \
+pilot-containment-cone-plate_0022 \
+pilot-containment-cone-plate_0029 \
+pilot-containment-cone-plate_0034 \
+pilot-containment-multi-bowl_0042 \
+pilot-containment-multi-bowl_0048 \
+pilot-containment-vase_torus_0031 \
+pilot_dominoes_SJ020_d3chairs_o1plants_tdwroom_0005 \
+pilot_it2_collision_non-sphere_box_0002 \
+pilot_it2_collision_non-sphere_tdw_1_dis_1_occ_0004 \
+pilot_it2_collision_non-sphere_tdw_1_dis_1_occ_0007 \
+pilot_it2_drop_simple_box_0000 \
+pilot_it2_drop_simple_box_0042 \
+pilot_it2_drop_simple_tdw_1_dis_1_occ_0003 \
+pilot_it2_rollingSliding_simple_collision_box_0008 \
+pilot_it2_rollingSliding_simple_collision_box_large_force_0009 \
+pilot_it2_rollingSliding_simple_collision_tdw_1_dis_1_occ_0002 \
+pilot_it2_rollingSliding_simple_ledge_tdw_1_dis_1_occ_sphere_small_zone_0022 \
+pilot_it2_rollingSliding_simple_ramp_box_small_zone_0006 \
+pilot_it2_rollingSliding_simple_ramp_tdw_1_dis_1_occ_small_zone_0004 \
+pilot_it2_rollingSliding_simple_ramp_tdw_1_dis_1_occ_small_zone_0017 \
+pilot_linking_nl1-8_mg000_aCyl_bCyl_tdwroom1_long_a_0022 \
+pilot_linking_nl1-8_mg000_aCylcap_bCyl_tdwroom1_0012 \
+pilot_linking_nl1-8_mg000_aCylcap_bCyl_tdwroom_small_rings_0006 \
+pilot_linking_nl1-8_mg000_aCylcap_bCyl_tdwroom_small_rings_0010 \
+pilot_linking_nl1-8_mg000_aCylcap_bCyl_tdwroom_small_rings_0029 \
+pilot_linking_nl1-8_mg000_aCylcap_bCyl_tdwroom_small_rings_0036 \
+pilot_linking_nl6_aNone_bCone_occ1_dis1_boxroom_0028 \
+pilot_towers_nb4_fr015_SJ000_gr000sph_mono1_dis0_occ0_tdwroom_stable_0000 \
+pilot_towers_nb4_fr015_SJ000_gr000sph_mono1_dis0_occ0_tdwroom_stable_0002 \
+pilot_towers_nb4_fr015_SJ000_gr000sph_mono1_dis0_occ0_tdwroom_stable_0003 \
+pilot_towers_nb4_fr015_SJ000_gr000sph_mono1_dis0_occ0_tdwroom_stable_0010 \
+pilot_towers_nb4_fr015_SJ000_gr000sph_mono1_dis0_occ0_tdwroom_stable_0013 \
+pilot_towers_nb4_fr015_SJ000_gr000sph_mono1_dis0_occ0_tdwroom_stable_0017 \
+pilot_towers_nb4_fr015_SJ000_gr000sph_mono1_dis0_occ0_tdwroom_stable_0018 \
+pilot_towers_nb4_fr015_SJ000_gr000sph_mono1_dis0_occ0_tdwroom_stable_0032 \
+pilot_towers_nb4_fr015_SJ000_gr000sph_mono1_dis0_occ0_tdwroom_stable_0036 \
+pilot_towers_nb4_fr015_SJ000_gr01_mono0_dis1_occ1_tdwroom_unstable_0021 \
+pilot_towers_nb4_fr015_SJ000_gr01_mono0_dis1_occ1_tdwroom_unstable_0041 \
+pilot_towers_nb5_fr015_SJ030_mono0_dis0_occ0_boxroom_unstable_0006 \
+pilot_towers_nb5_fr015_SJ030_mono0_dis0_occ0_boxroom_unstable_0009".split(' ')
 
-def load_hdf5(file_path, dataset_name, indices=None, mean=False):
+buggy_stims = []
 
-    # breakpoint()
+import numpy as np
+def get_label(f):
+#     try:
+    with h5py.File(f) as h5file:
+        arr = []
+
+        for key in h5file['frames'].keys():
+            arr.append(np.array(h5file['frames'][key]['labels']['target_contacting_zone']))
+
+        return int(key), np.any(arr).item()
+
+
+def load_hdf5(file_path, dataset_name, indices=None, mean=False, ocd=False, mode='train'):
+
+
 
     # file_path = file_path.split('.')[-2] + '_temp.hdf5'
 
+    global blacklisted_inds
+
+    blacklisted_inds = []
+
     with h5py.File(file_path, 'r') as file:
+
         if indices is None:
             dataset = file[dataset_name][...]
         else:
             dataset = file[dataset_name][sorted(indices)]
 
+
+        # if dataset_name != 'label':
+        #     dataset = dataset.reshape(dataset.shape[0], 8, 14, 14, 768)[:, ::2]
+
+        filenames = file['filenames'][...]
+
+        # if mode == 'test':
+        # arr = []
+        # for ct, f in enumerate(filenames):
+        #     if str(f).split('/')[-1].split('.')[0] in buggy_stims:
+        #         blacklisted_inds.append(ct)
+
+        #
+        # if dataset_name != 'label':
+        #     dataset = np.stack(arr, 0)#[:100]
+        # else:
+        #     # breakpoint()
+        #     dataset = np.array(arr)#[:100]
+
+
+        # if dataset_name != 'label':
+        #     dataset = dataset[:, :, :4, :]
+        #     print("no fft", dataset.shape)
+
+        # else:
+        #     if indices is None:
+        #         dataset = file['group_name']['dataset_name'][...] #[dataset_name][...]
+        #     else:
+        #         dataset = file['group_name']['dataset_name'][sorted(indices)] #[dataset_name][sorted(indices)]
+
     #save stimulus map here if it doesn't exist.
+        # if 'dataset_name' != 'label':
+        #     dataset = dataset
     if mean:
         if dataset_name != 'label':
             # dataset = dataset.mean(axis=-2)
-            dataset = dataset.reshape(dataset.shape[0], 2, 64, 64, 256)
+            dataset = dataset.reshape(dataset.shape[0], 4, 64, 64, 256)
             dataset = dataset[:, :, ::2, ::2, :]
 
     # breakpoint()
@@ -220,10 +314,12 @@ def all_scenario_eval(args, model, data, target, scenario, result, indices, resu
 
 def test_model(model, test_data, test_label, args, result):
     with open(args.test_scenario_indices, 'r') as f:
-        test_data = test_data.reshape(test_data.shape[0], -1)
-        accuracy = model.score(test_data, test_label)
-        print(f"Accuracy on full test data: {accuracy:.4f}")
-        result['full_test'] = accuracy
+        test_data = test_data.reshape(test_data.shape[0], -1)#[:, :10]
+        inds = np.arange(test_data.shape[0])
+        inds = [x for x in inds if x not in blacklisted_inds]
+        # accuracy = model.score(test_data[inds], test_label[inds])
+        # print(f"Accuracy on full test data: {accuracy:.4f}")
+        # result['full_test'] = accuracy
         scenarios_indices = json.load(f)
 
         # breakpoint()
@@ -232,7 +328,7 @@ def test_model(model, test_data, test_label, args, result):
               'Test Accuracy', 'Readout Type', 'Predicted Prob_false', 
               'Predicted Prob_true', 'Predicted Outcome', 'Actual Outcome', 
               'Stimulus Name']]
-        
+
         for sc in scenarios_indices.keys():
             if args.one_scenario is not None and args.one_scenario != 'all':
                 ind = sorted(scenarios_indices[args.one_scenario])
@@ -242,6 +338,8 @@ def test_model(model, test_data, test_label, args, result):
                 break
             elif args.one_scenario == 'all':
                 ind = sorted(scenarios_indices[sc])
+                # breakpoint()
+                ind = [x for x in ind if x not in blacklisted_inds]
                 data, target = test_data[ind], test_label[ind]
                 result, results = all_scenario_eval(args, model, data, target, 
                                   sc, result, ind,
@@ -251,9 +349,16 @@ def test_model(model, test_data, test_label, args, result):
                 accuracy = model.score(test_data[ind], test_label[ind])
                 result[sc+'_test'] = accuracy
                 print(f"Accuracy on %s test data: {accuracy:.4f}"%sc)
+
+        all_acc_sce = []
+        for sc in scenarios_indices.keys():
+            all_acc_sce.append(result[sc+'_test'])
+
+        print(f"Accuracy on full test data avg scenario: {np.mean(all_acc_sce):.4f}")
+        result['full_test_sce_acc'] = np.mean(all_acc_sce)
+
         if args.one_scenario == 'all':
-            filename = args.data_type+'_'+ args.model_type + '_' +args.scenario_name+ \
-            '_only_'+str(args.one_scenario)+'_results.csv'
+            filename = args.save_path + '/' + args.data_type + '_results.csv'
             with open(filename, 'w', newline='') as file:
                 writer = csv.writer(file)
                 writer.writerows(results)
@@ -266,6 +371,9 @@ def get_indices(scenarios_indices):
     return indices
 
 def train(args):
+
+    if not os.path.exists(args.save_path):
+        os.makedirs(args.save_path)
 
     if args.balance_readout:
         data_path, json_path = load_save_hdf5(args.data_path, include=True)
@@ -306,7 +414,7 @@ def train(args):
         scenario_feature = 'features_mid'
     else:
         scenario_feature = args.scenario
-    X = load_hdf5(args.data_path, scenario_feature, indices, mean=args.mean)
+    X = load_hdf5(args.data_path, scenario_feature, indices, mean=args.mean, mode='train')
 
     # breakpoint()
 
@@ -325,8 +433,8 @@ def train(args):
         X = X[:, -1, :, :11]
         # breakpoint()
 
-    X = X.reshape(X.shape[0], -1)
-    y = load_hdf5(args.data_path, 'label', indices)
+    X = X.reshape(X.shape[0], -1)#[:, :10]
+    y = load_hdf5(args.data_path, 'label', indices, mode='train')
     # X, y = balance_data(X, y)
     print(X.shape)
 
@@ -335,11 +443,13 @@ def train(args):
     print('Load model')
     if args.model_type == 'logistic':
         if args.ocp:
-            param_grid = {'clf__C': np.array([1e-5, 0.01, 0.1, 1]), 'clf__penalty': ['l2']}  #
+            # param_grid = {'clf__C': np.array([1e-5, 0.01, 0.1, 1]), 'clf__penalty': ['l2']}  #
+            # param_grid = {'clf__C': np.array([1e-5, 0.01, 0.1, 1]), 'clf__penalty': ['l2']}  #
+            param_grid = {'clf__C': np.array([1e-6, 1e-5, 1e-3, 0.1]), 'clf__penalty': ['l2']} #
         else:
-            param_grid = {'clf__C': np.array([1e-5, 0.01, 0.1, 1, 5, 10, 20]), 'clf__penalty': ['l2']}#  np.logspace(-1, 3, 5), 'clf__penalty': ['l2']}
-        # param_grid = {'clf__C': np.array([1e-5, 0.01, 0.1]),
-        #               'clf__penalty': ['l2']}  # np.logspace(-1, 3, 5), 'clf__penalty': ['l2']}
+            # param_grid = {'clf__C': np.array([1e-5, 0.01, 0.1, 1, 5, 10, 20]), 'clf__penalty': ['l2']}#  np.logspace(-1, 3, 5), 'clf__penalty': ['l2']}
+            # param_grid = {'clf__C': np.array([1e-5, 0.01]),'clf__penalty': ['l2']}  # np.logspace(-1, 3, 5), 'clf__penalty': ['l2']}
+            param_grid = {'clf__C': np.array([1e-5, 0.01]), 'clf__penalty': ['l2']}
         model = LogisticRegression(max_iter=20000)
     elif args.model_type == 'svc':
         param_grid = {'clf__C': np.logspace(-3, 0, 4), 'clf__loss': ['hinge']}
@@ -366,7 +476,7 @@ def train(args):
     result['train'] = accuracy
     
     #
-    test_data = load_hdf5(args.test_path, scenario_feature, mean=args.mean)
+    test_data = load_hdf5(args.test_path, scenario_feature, mean=args.mean, mode='test')
     if args.scenario_name in ['observed_gamma', 'observed_beta', 'observed_mcvd_ucf' , 'observed_teco_h']:
         test_data = test_data[:, 0]
     elif args.scenario_name in ['observed_fitvid', 'observed_ego4d_fitvid']:
@@ -383,7 +493,7 @@ def train(args):
     test_label = load_hdf5(args.test_path, 'label')
     result = test_model(grid_search, test_data, test_label, args, result)
     
-    filename = args.data_type+'_'+ args.model_type + '_' +args.scenario_name+'_exclude_'+str(args.all_but_one)+'_results.json'     
+    filename = args.save_path + '/' + args.data_type + '_results.json'
 
     with open(filename, 'w') as f:
         json.dump(result, f)
@@ -439,6 +549,8 @@ def main():
 
     parser.add_argument('--mean', action='store_true', default=False,
                         help='reg')
+    parser.add_argument('--save_path', type=str, help='where to save the results')
+
     args = parser.parse_args()
 
     train(args)

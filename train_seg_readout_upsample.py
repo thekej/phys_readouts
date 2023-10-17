@@ -46,7 +46,10 @@ dir_save_images_test = '/'.join(args.train_features_hdf5.split('/')[:-1]) + '/te
 if not os.path.exists(dir_save_images_test):
     os.makedirs(dir_save_images_test)
 
+dir_save_results = '/'.join(args.train_features_hdf5.split('/')[:-1])
 
+if not os.path.exists(dir_save_results):
+    os.makedirs(dir_save_results)
 
 #command to run this script
 #python train_seg_readout.py --train_features_hdf5 /ccn2/u/rmvenkat/data/test_with_keypoint_model_3_feats/M4/train_features.hdf5 --test_features_hdf5 /ccn2/u/rmvenkat/data/test_with_keypoint_model_3_feats/M4/test_features.hdf5 --feature_dim 256 --model_type CWM
@@ -64,8 +67,10 @@ physion_val_datset = Physion(gaps=times, \
 physion_test_datset = Physion(gaps=times, \
                          hdf5_path=args.test_features_hdf5,
                          full_video=True, start_zero=False, phase='test')
+#
+train_dataloader = MultiEpochsDataLoader(physion_train_datset, batch_size=32, shuffle=True, num_workers=20)
 
-train_dataloader = MultiEpochsDataLoader(physion_train_datset, batch_size=32, shuffle=True, num_workers=32)
+# train_dataloader = MultiEpochsDataLoader(physion_train_datset, batch_size=1, shuffle=True, num_workers=1)
 
 val_loader = MultiEpochsDataLoader(physion_val_datset, batch_size=1, shuffle=False, num_workers=1)
 
@@ -79,8 +84,8 @@ num_predicted_masks = 11
 num_hidden_layers = 1
 hidden_dim = 64
 feature_dim = physion_train_datset.all_features[0].shape[-1]
-val_after = 5
-
+val_after = 10
+#
 lr_list = [1e-2, 1e-3, 1e-4]
 
 num_epochs = 300
@@ -92,7 +97,7 @@ upsample_size = (upsample_size, upsample_size)
 
 kernel_size = int(size[0] // upsample_size[0])
 
-convergence_thresh = 4
+convergence_thresh = 3
 
 overall_best_iou = 0
 
@@ -133,7 +138,8 @@ for lr in lr_list:
         t = time.time()
         for i, batch in enumerate(train_dataloader):
             # Features
-            seg_color = torch.tensor(batch['feature']).squeeze(1)  # / 255. # [B, H, W, 3]
+            seg_color = torch.tensor(batch['feature'])#.squeeze(1)  # / 255. # [B, H, W, 3]
+            # breakpoint()
             feature = F.interpolate(seg_color.permute(0, 3, 1, 2).cuda(), upsample_size, mode='bilinear') # [B, 3, h, w]
 
             # Targets
@@ -166,10 +172,12 @@ for lr in lr_list:
             loss.backward()
             optimizer.step()
 
+            # break
+
         print('time:', time.time() - t, f'Epoch:{epoch_num}, Train loss:{loss.item():.5f}')
 
         if epoch_num % val_after == 0:
-            mean_iou = compute_mean_iou_over_dataset(val_loader, model, upsample_size, size, dir_save_images_val, permute=False)
+            mean_iou = compute_mean_iou_over_dataset(val_loader, model, upsample_size, size, dir_save_images_val, permute=False, avg=True)
             print(f'Epoch:{epoch_num}, Val Mean IoU:{mean_iou:.5f}', 'loss:', loss.item())
             if mean_iou > best_val_iou:
                 counter_converge = 0
@@ -189,12 +197,31 @@ for lr in lr_list:
 
 model.load_state_dict(torch.load(model_save_path))
 
-test_iou = compute_mean_iou_over_dataset(test_loader, model, upsample_size, size, dir_save_images_test, permute=False)
+mean_iou_list, all_filenames, all_scenarios_mious = compute_mean_iou_over_dataset(test_loader, model, upsample_size, size, dir_save_images_test, permute=False)
 
-print(f'Test Mean IoU:{test_iou:.5f}')
+json_file = os.path.join(dir_save_results, 'segmentation_results.json')
 
-fileo = open(args.model_type + '_.txt', 'w')
-fileo.write('Test Mean IoU:' + str(test_iou))
-#best lr
-fileo.write('Best lr:' + str(best_lr))
-fileo.close()
+result_dict = {}
+result_dict['full_test'] = float(np.mean(mean_iou_list))
+
+print(f'Test Mean IoU:{np.mean(mean_iou_list):.5f}')
+
+accs = []
+for key in all_scenarios_mious:
+    print(f'{key} Mean IoU:{all_scenarios_mious[key]:.5f}')
+    result_dict[key + '_test'] = float(all_scenarios_mious[key])
+    accs.append(all_scenarios_mious[key])
+
+print(f'Test Mean IoU by scenario:{np.mean(accs):.5f}')
+
+result_dict['full_test_sce_acc'] = float(np.mean(accs))
+
+import json
+with open(json_file, 'w') as fp: json.dump(result_dict, fp)
+
+result = {}
+result['filenames'] = [str(x) for x in all_filenames]
+result['mious'] = [float(x) for x in mean_iou_list]
+json_file = os.path.join(dir_save_results, 'segmentation_results_by_stim.json')
+with open(json_file, 'w') as fp:
+    json.dump(result, fp)
