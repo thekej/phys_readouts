@@ -68,6 +68,39 @@ class LSTM(nn.Module):
         x = self.regressor(x)
         return x
 
+
+class DINOV2(nn.module):
+    def __init__(self, weights_path, model_name):
+        super().__init__()
+        from transformers import AutoModel as automodel
+        self.model = automodel.from_pretrained('facebook/' + model_name)#.to(device).eval()
+
+    def forward(self, images):
+        '''
+        images: [B, C, H, W], Image is normalized with imagenet norm
+        '''
+        input_dict = {'pixel_values': images}
+
+        decoder_outputs = self.model(**input_dict, output_hidden_states=True)
+
+        features = decoder_outputs.last_hidden_state
+
+        return features
+
+
+    def extract_features(self, videos):
+        '''
+        videos: [B, C, T, H, W], T is usually 4 and videos are normalized with imagenet norm
+        returns: [B, T, D] extracted features
+        '''
+        videos = videos.permute(0, 2, 1, 3, 4)[:, :4]
+        bs, num_frames, num_channels, h, w = videos.shape
+        videos = videos.flatten(0, 1)
+        features = self.fwd(videos)
+        features = features.reshape(bs, -1, features.shape[2])
+
+        return features
+
 # Given sequence of images, predicts next latent
 class FrozenPretrainedEncoder(nn.Module):
     def __init__(self, encoder, dynamics, n_past=7, full_rollout=False):
