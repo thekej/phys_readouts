@@ -192,6 +192,8 @@ class FrozenPretrainedEncoder(nn.Module):
 def _get_encoder(encoder):
     if encoder == "r3m":
         return R3M_pretrained
+    elif encoder == "dino":
+        return DINOV2
     else:
         raise NotImplementedError(encoder)
 
