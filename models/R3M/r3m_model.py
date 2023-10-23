@@ -69,11 +69,12 @@ class LSTM(nn.Module):
         return x
 
 
-class DINOV2(nn.module):
-    def __init__(self, weights_path, model_name):
+class DINOV2(nn.Module):
+    def __init__(self):
         super().__init__()
         from transformers import AutoModel as automodel
-        self.model = automodel.from_pretrained('facebook/' + model_name)#.to(device).eval()
+        self.model = automodel.from_pretrained('facebook/dinov2-large')#.to(device).eval()
+        self.latent_dim = 2048
 
     def forward(self, images):
         '''
@@ -84,7 +85,11 @@ class DINOV2(nn.module):
         decoder_outputs = self.model(**input_dict, output_hidden_states=True)
 
         features = decoder_outputs.last_hidden_state
-
+        
+        features_1 = features[:, 0].unsqueeze(1)
+        features_2 = nn.AdaptiveAvgPool2d((1, 1024))(features[:, 1:].float())
+        
+        features = torch.cat((features_1, features_2), dim=1)
         return features
 
 
@@ -96,7 +101,7 @@ class DINOV2(nn.module):
         videos = videos.permute(0, 2, 1, 3, 4)[:, :4]
         bs, num_frames, num_channels, h, w = videos.shape
         videos = videos.flatten(0, 1)
-        features = self.fwd(videos)
+        features = self.forward(videos)
         features = features.reshape(bs, -1, features.shape[2])
 
         return features
@@ -184,7 +189,8 @@ class FrozenPretrainedEncoder(nn.Module):
         return feats
 
     def _extract_feats(self, x):
-        feats = torch.flatten(self.encoder(x), start_dim=1)  # (Bs, -1)
+        feats = self.encoder(x)
+        feats = torch.flatten(feats, start_dim=1)  # (Bs, -1)
         return feats
 
 
@@ -209,6 +215,11 @@ def _get_dynamics(dynamics):
 def pfR3M_LSTM_physion(n_past=7, **kwargs):
     return FrozenPretrainedEncoder(
         encoder="r3m", dynamics="lstm", n_past=n_past, **kwargs
+    )
+
+def pfDINO_LSTM_physion(n_past=7, **kwargs):
+    return FrozenPretrainedEncoder(
+        encoder="dino", dynamics="lstm", n_past=n_past, **kwargs
     )
 
 def pfR3M_ID(n_past=7, **kwargs):

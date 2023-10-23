@@ -10,9 +10,29 @@ from PIL import Image
 from torchvision import transforms
 from decord import VideoReader
 
+class GroupNormalize(object):
+    def __init__(self, mean, std):
+        self.mean = mean
+        self.std = std
+
+    def __call__(self, tensor):
+        rep_mean = self.mean * (tensor.size()[0]//len(self.mean))
+        rep_std = self.std * (tensor.size()[0]//len(self.std))
+        
+        # TODO: make efficient
+        for t, m, s in zip(tensor, rep_mean, rep_std):
+            t.sub_(m).div_(s)
+
+        return tensor
+
 R3M_VAL_TRANSFORMS = transforms.Compose([transforms.Resize(256),
                       transforms.CenterCrop(224),
                       transforms.ToTensor(),])
+
+DINO_VAL_TRANSFORMS = [
+                      GroupNormalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+                                        ]
+
 
 class R3MDataset(Dataset):
     def __init__(self, h5_path):
@@ -34,6 +54,7 @@ class R3MTrainDataset(Dataset):
         data = h5py.File(h5_path)
         self.videos = data['video']
         self.indices = indices
+        
 
 
     def __len__(self):
@@ -43,6 +64,43 @@ class R3MTrainDataset(Dataset):
         index = self.indices[index]
         x = self.videos[index]
         return x
+
+
+class DINODataset(Dataset):
+    def __init__(self, h5_path):
+        data = h5py.File(h5_path, 'r')
+        self.videos = data['video']
+        self.labels = data['label']
+        self.data_transform = transforms.Compose(DINO_VAL_TRANSFORMS)
+
+    def __len__(self):
+        return len(self.labels)
+
+    def __getitem__(self, index):
+        video_frames = self.videos[index]
+        transformed_video = [self.data_transform(torch.tensor(frame)) for frame in video_frames]
+        return torch.stack(transformed_video), self.labels[index]
+    
+    
+class DINOTrainDataset(Dataset):
+    def __init__(self, h5_path, indices):
+        data = h5py.File(h5_path, 'r')
+        self.videos = data['video']
+        self.indices = indices
+        self.data_transform = transforms.Compose(DINO_VAL_TRANSFORMS)  # Define R3M_TRAIN_TRANSFORMS if not already
+
+    def __len__(self):
+        return len(self.indices)
+
+    def __getitem__(self, index):
+        index = self.indices[index]
+        video_frames = self.videos[index]
+        transformed_video = [self.data_transform(torch.tensor(frame)) for frame in video_frames]
+        transformed_video = torch.stack(transformed_video)
+        return transformed_video
+
+
+    
     
 class Ego4D(torch.utils.data.Dataset):
     def __init__(self,

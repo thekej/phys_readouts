@@ -9,8 +9,8 @@ from torch.optim import Adam
 from torch.utils.data import Dataset, DataLoader
 from torchvision.transforms import ToTensor
 
-from r3m_loader import R3MTrainDataset, Ego4D
-from r3m_model import FrozenPretrainedEncoder, load_model, pfR3M_LSTM_physion
+from r3m_loader import R3MTrainDataset, DINOTrainDataset, Ego4D
+from r3m_model import FrozenPretrainedEncoder, load_model, pfR3M_LSTM_physion, pfDINO_LSTM_physion
 
 
 def validate_model(training_logs, model, batch_idx, total_batches,
@@ -48,7 +48,10 @@ def train(args):
     # Define the device to run the model on
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     #Load the model
-    model = pfR3M_LSTM_physion(n_past=7)
+    if args.model_type == 'r3m':
+        model = pfR3M_LSTM_physion(n_past=7)
+    else:
+        model = pfDINO_LSTM_physion(n_past=7)
     model = model.to(device)
     
     
@@ -60,8 +63,12 @@ def train(args):
         random.shuffle(indices)
         train_indices = range(int(args.data_size * 0.9))
         val_indices = list(set(indices) - set(train_indices))
-        train_dataset = R3MTrainDataset(args.data_path, indices=train_indices)
-        val_dataset = R3MTrainDataset(args.data_path, indices=val_indices)
+        if args.model_type == 'r3m':
+            train_dataset = R3MTrainDataset(args.data_path, indices=train_indices)
+            val_dataset = R3MTrainDataset(args.data_path, indices=val_indices)
+        else:
+            train_dataset = DINOTrainDataset(args.data_path, indices=train_indices)
+            val_dataset = DINOTrainDataset(args.data_path, indices=val_indices)
 
         # Create data loaders
         train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=4)
@@ -169,6 +176,8 @@ if __name__ == '__main__':
                         help='Number of samples in the dataset')
     parser.add_argument('--data-type', type=str, default='ego4d',
                         help='Number of samples in the dataset')
+    parser.add_argument('--model-type', type=str, default='r3m',
+                        help='Number of samples in the dataset')
     parser.add_argument('--batch-size', type=int, default=32,
                         help='Batch size for training')
     parser.add_argument('--lr', type=float, default=1e-4,
@@ -179,7 +188,7 @@ if __name__ == '__main__':
                         help='Save file path')
     parser.add_argument('--log-step', type=int, default=1,
                         help='Log loss frequency')
-    parser.add_argument('--save-step', type=int, default=10000,
+    parser.add_argument('--save-step', type=int, default=1000,
                         help='Log loss frequency')
     parser.add_argument('--log-files', type=str, required=True,
                         help='Log file path')
