@@ -214,6 +214,7 @@ class MCVD(PhysionFeatureExtractor):
 
 
 class FITVID(PhysionFeatureExtractor):
+    # input is (Bs, T, 3, H, W)
     def __init__(self, weights_path, n_past=7):
         super().__init__()
         from models.FITVID import FitVid
@@ -245,3 +246,32 @@ class FITVID(PhysionFeatureExtractor):
 
     def extract_features_ocd(self, videos):
         return self.extract_features(videos)
+    
+class Extractor(nn.Module):
+    def __init__(self, model_name, 
+                 weights_path,
+                 n_past=7, 
+                 model_type='physion',
+                 n_features=1):
+        self.model = None
+        if model_name == 'fitvid':
+            self.model = FITVID(weights_path, 
+                                n_past=n_past)
+        elif model_name == 'mcvd':
+            self.model = MCVD(weights_path, 
+                              model_type=model_type,
+                              n_features=n_features,  
+                              n_context=n_past)
+        elif model_name == 'dino':
+            self.model = DINOV2(weights_path, model_name)
+        elif model_name == 'dino_lstm':
+            self.model = DINOV2_LSTM(weights_path)
+        elif model_name == 'r3m_lstm':
+            self.model = R3M_LSTM(weights_path)
+            
+            
+    def extract_features(self, videos):
+        return self.model.extract_features(videos)
+
+    def extract_features_ocd(self, videos):
+        return self.model.extract_features_ocd(videos)
