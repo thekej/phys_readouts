@@ -1,5 +1,6 @@
 import numpy as np
 import torch.nn as nn
+import get_fourier_features
 
 class PhysionFeatureExtractor(nn.Module):
 
@@ -50,7 +51,11 @@ class DINOV2(PhysionFeatureExtractor):
         bs, num_frames, num_channels, h, w = videos.shape
         videos = videos.flatten(0, 1)
         features = self.fwd(videos)
-        features = features.reshape(bs, -1, features.shape[2])
+
+        patch_size = int(np.sqrt(features.shape[1]-1))
+        features = features[:, 1:].view(features.shape[0], patch_size, patch_size, -1)
+        # Add Fourier features
+        features = get_fourier_features(features)
 
         return features
 
@@ -76,20 +81,32 @@ class R3M_LSTM(PhysionFeatureExtractor):
         super().__init__()
         from models.R3M.r3m_model import pfR3M_LSTM_physion, load_model
         self.model = pfR3M_LSTM_physion()
-        model = load_model(model, weights_path)
+        self.model = load_model(self.model, weights_path)
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        model = model.to(device)
-
+        self.model = self.model.to(device)
+        self.data_transform = transforms.Compose(
+                                    [transforms.Resize(256),
+                                     transforms.CenterCrop(224),
+                                     transforms.ToTensor(),]
+                                    )
 
     def extract_features(self, videos):
+        videos = torch.stack([self.data_transform(img) for img in videos])
         output = model(videos)
         features = output["input_states"].detach().cpu().numpy()
-        return features
+        features = features.view(features.shape[0], -1, 32)
+        patch_size = int(np.sqrt(features.shape[1]))
+        features = features.view(features.shape[0], patch_size, patch_size, -1)
+        return get_fourier_features(features)
 
     def extract_features_ocd(self, img):
+        videos = torch.stack([self.data_transform(img) for img in videos])
         output = model(videos)
         features = output["observed_states"].detach().cpu().numpy()
-        return features
+        features = features.reshape(features.shape[0], -1, 32)
+        patch_size = int(np.sqrt(features.shape[1]))
+        features = features.reshape(features.shape[0], patch_size, patch_size, -1)
+        return get_fourier_features(features)
 
     
 class DINOV2_LSTM(PhysionFeatureExtractor):
@@ -100,17 +117,29 @@ class DINOV2_LSTM(PhysionFeatureExtractor):
         self.model = load_model(self.model, weights_path)
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model = self.model.to(device)
-
+        self.data_transform = transforms.Compose(
+                                    [transforms.Resize(256),
+                                     transforms.CenterCrop(224),
+                                     transforms.ToTensor(),]
+                                    )
 
     def extract_features(self, videos):
+        videos = torch.stack([self.data_transform(img) for img in videos])
         output = model(videos)
         features = output["input_states"].detach().cpu().numpy()
-        return features
+        features = features.reshape(features.shape[0], -1, 32)
+        patch_size = int(np.sqrt(features.shape[1]))
+        features = features.reshape(features.shape[0], patch_size, patch_size, -1)
+        return get_fourier_features(features)
 
     def extract_features_ocd(self, videos):
+        videos = torch.stack([self.data_transform(img) for img in videos])
         output = model(videos)
         features = output["observed_states"].detach().cpu().numpy()
-        return features
+        features = features.reshape(features.shape[0], -1, 32)
+        patch_size = int(np.sqrt(features.shape[1]))
+        features = features.reshape(features.shape[0], patch_size, patch_size, -1)
+        return get_fourier_features(features)
     
     
 class MCVD(PhysionFeatureExtractor):
@@ -129,9 +158,13 @@ class MCVD(PhysionFeatureExtractor):
         self.sampler = get_readout_sampler(self.config)
         self.n_features = n_features
         self.n_context = n_context
+        self.data_transform = transforms.Compose(
+                                [transforms.Resize(64), 
+                                 transforms.ToTensor(),])
 
 
     def extract_features(self, videos):
+        videos = torch.stack([self.data_transform(img) for img in videos])
         input_frames = data_transform(self.config, videos)
         if self.model_type == 'ucf':
             real, cond, cond_mask = conditioning_fn(self.config, input_frames[:, 8:16, :, :, :],
@@ -148,9 +181,15 @@ class MCVD(PhysionFeatureExtractor):
                                          cond_mask=cond_mask,
                                          subsample=100, verbose=True)
         #TODO: Add FFT aggregation
-        return mid.numpy()
+        feature = mid.numpy()
+        features = features.reshape(mid.shape[0], -1, 32)
+        patch_size = int(np.sqrt(features.shape[1]))
+        features = features.reshape(features.shape[0], patch_size, patch_size, -1)
+        return get_fourier_features(features)
 
     def extract_features_ocd(self, videos):
+        videos = torch.stack([self.data_transform(img) for img in videos])
+        input_frames = data_transform(self.config, videos)
         output = []
         for j in range(self.n_features):
             real, cond, cond_mask = conditioning_fn(config, input_frames[:, 4*j:4*j+8, :, :, :], 
@@ -159,10 +198,19 @@ class MCVD(PhysionFeatureExtractor):
                                         prob_mask_future=getattr(config.data, 'prob_mask_future', 0.0))
 
             init = init_samples(len(real), config)
-            pred, gamma, beta, mid = sampler(init, scorenet, cond=cond, cond_mask=cond_mask, subsample=args.sub, verbose=True)
+            pred, gamma, beta, mid = sampler(init, scorenet, 
+                                             cond=cond, 
+                                             cond_mask=cond_mask, 
+                                             subsample=args.sub, 
+                                             verbose=True)
             #TODO: Add FFT aggregation
+            
             output +=  [mid.numpy()]
-        return np.stack(features, dim=1)
+        features = np.stack(features, dim=1)
+        features = features.reshape(mid.shape[0], -1, 32)
+        patch_size = int(np.sqrt(features.shape[1]))
+        features = features.reshape(features.shape[0], patch_size, patch_size, -1)
+        return get_fourier_features(features)
 
 
 class FITVID(PhysionFeatureExtractor):
@@ -182,48 +230,18 @@ class FITVID(PhysionFeatureExtractor):
 
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model = model.to(device)
+        self.data_transform = transforms.Compose(
+                        [transforms.Resize(64), transforms.ToTensor(),])
 
 
     def extract_features(self, videos):
+        videos = torch.stack([self.data_transform(img) for img in videos])
         output = self.model(videos)
         features = output['h_preds']
-        return features
+        features = features.reshape(mid.shape[0], -1, 32)
+        patch_size = int(np.sqrt(features.shape[1]))
+        features = features.reshape(features.shape[0], patch_size, patch_size, -1)
+        return get_fourier_features(features)
 
     def extract_features_ocd(self, videos):
         return self.extract_features(videos)
-    
-
-class RPIN(PhysionFeatureExtractor):
-    def __init__(self, weights_path, n_past=7):
-        super().__init__()
-        pass
-
-    def extract_features(self, videos):
-        pass
-
-    def extract_features_ocd(self, videos):
-        pass
-    
-    
-class SGNN(PhysionFeatureExtractor):
-    def __init__(self, weights_path, n_past=7):
-        super().__init__()
-        pass
-
-    def extract_features(self, videos):
-        pass
-
-    def extract_features_ocd(self, videos):
-        pass
-    
-    
-class TECO(PhysionFeatureExtractor):
-    def __init__(self, weights_path, n_past=7):
-        super().__init__()
-        pass
-
-    def extract_features(self, videos):
-        pass
-
-    def extract_features_ocd(self, videos):
-        pass

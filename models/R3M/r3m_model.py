@@ -98,7 +98,7 @@ class DINOV2(nn.Module):
         videos: [B, C, T, H, W], T is usually 4 and videos are normalized with imagenet norm
         returns: [B, T, D] extracted features
         '''
-        videos = videos.permute(0, 2, 1, 3, 4)[:, :4]
+        videos = videos.permute(0, 2, 1, 3, 4)
         bs, num_frames, num_channels, h, w = videos.shape
         videos = videos.flatten(0, 1)
         features = self.forward(videos)
