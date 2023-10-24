@@ -6,7 +6,8 @@ import tqdm
 import h5py
 import torch 
 
-from models import Extractor, UnifiedPhysion
+from models.feature_extractors import Extractor
+from models.unified_loader import UnifiedPhysion
 from torch.utils.data import Dataset, DataLoader
 from collections import OrderedDict
 
@@ -21,8 +22,11 @@ def main(args):
 
     print('load data')
     dataset = UnifiedPhysion(args.data_path, frame_duration=args.frame_duration,
-                            ocd=args.ocd, video_len = args.video_len)
-    loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False)
+                            ocd= args.task == 'ocd', video_len = args.video_len)
+    loader = DataLoader(dataset, batch_size=args.batch_size, 
+                        shuffle=False, num_workers=8)
+    print(loader.num_workers)  # This will print "4" in this example
+
     data_size = len(loader)#5608
         
     # set up new dataset
@@ -30,23 +34,23 @@ def main(args):
     contacts_dset = []
     features_dset = []
     filename = []
-
+    import time
     print('start extraction')
     for i, batch in enumerate(tqdm.tqdm(loader)):
         videos, labels, contacts = batch['video'], batch['label'], batch['contacts']
-        
-        videos = videos.to('cuda')
+        #videos = videos.to('cuda')
         
         label_dset += [labels.reshape(-1)]
         contacts_dset += [contacts]
         filename += batch['filename']
         # input is (Bs, T, 3, H, W)
-        
+        t = time.time()
         if args.task == 'ocp':
             output = model.extract_features(videos)
         else:
             output = model.extract_features_ocd(videos)
-
+        t1 = time.time()
+        print(t1 - t)
         features_dset += [output]
 
 
@@ -65,8 +69,10 @@ if __name__ == '__main__':
     parser.add_argument('--model_path', type=str, required=True)
     parser.add_argument('--model_type', type=str, default='physion')
     parser.add_argument('--task', type=str, default='ocp')
-    parser.add_argument('--n-past', type=int, required=True)
-    parser.add_argument('--n-features', type=int, default=1)
+    parser.add_argument('--n_past', type=int, required=True)
+    parser.add_argument('--n_features', type=int, default=1)
+    parser.add_argument('--frame_duration', type=int, default=60)
+    parser.add_argument('--video_len', type=int, default=25)
     parser.add_argument('--data_path', type=str, required=True)
     parser.add_argument('--save_file', type=str, required=True)
     parser.add_argument('--batch_size', type=int, default=64)

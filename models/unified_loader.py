@@ -4,6 +4,7 @@ import h5py
 import io
 
 from PIL import Image
+from torch.utils.data import Dataset
 
 
 buggy_stims = "pilot-containment-cone-plate_0017 \
@@ -48,7 +49,6 @@ pilot_towers_nb4_fr015_SJ000_gr01_mono0_dis1_occ1_tdwroom_unstable_0041 \
 pilot_towers_nb5_fr015_SJ030_mono0_dis0_occ0_boxroom_unstable_0006 \
 pilot_towers_nb5_fr015_SJ030_mono0_dis0_occ0_boxroom_unstable_0009".split(' ')
 
-DATA_PATH = '/ccn2/u/rmvenkat/data/testing_physion/generate_all_physion_restarted_new/train_consolidated/lf_0/*/*/*.hdf5'
 
 import numpy as np
 def get_label(f):
@@ -66,7 +66,7 @@ def get_label(f):
 
 class UnifiedPhysion(Dataset):
 
-    def __init__(self, hdf5_path=DATA_PATH, 
+    def __init__(self, hdf5_path, 
                  frame_duration=150, 
                  ocd=False,
                  video_len = 25
@@ -77,7 +77,7 @@ class UnifiedPhysion(Dataset):
         else:
             self.buggy_stims = []
 
-        self.all_hdf5 = glob.glob(hdf5_path)
+        self.all_hdf5 = glob.glob(hdf5_path + '/*/*.hdf5')
 
         self.all_hdf5 = [x for x in self.all_hdf5 if ('temp' not in x) and ('encoding' not in x)]
 
@@ -91,7 +91,13 @@ class UnifiedPhysion(Dataset):
 
         self.get_label = get_label
         
-        self.frame_gap = frame_duration // 1000
+        self.frame_duration = frame_duration
+        
+        self.frame_gap = frame_duration / 10
+        
+        self.ocd = ocd
+        
+        self.video_len = video_len
 
     def __len__(self):
         return len(self.all_hdf5)
@@ -103,22 +109,24 @@ class UnifiedPhysion(Dataset):
 
             op = get_label(filename)
             frame_label = op[0]
-            frame_label = (frame_label - (frame_label % (frame_duration // 1000)))
+
+            frame_label = (frame_label - (frame_label % self.frame_gap))
             ret = {}
             ret['label'] = op[1]
             ret['frame_label'] = frame_label
+            frames = list(h5_file['frames'])
             
             if self.ocd:
                 indices = np.arange(frame_label - 2*self.frame_gap, 
                                     frame_label + 3*self.frame_gap, 
                                     self.frame_gap).clip(0, video_len - 1)
             else:
-                indices = np.arange(0, video_len, self.frame_gap)
-
+                indices = np.arange(0, len(frames), self.frame_gap)
+                
             if 'collide' in filename:
                 # print("file is collide", filename)
-                index_start = 300 // self.frame_gap
-                for i in range(0, video_len)[::-1]:
+                index_start = int(300 / self.frame_duration)
+                for i in range(0, indices.shape[0])[::-1]:
                     if i > index_Start:
                         indices[i] = indices[i - index_start]
                     else:
@@ -126,26 +134,31 @@ class UnifiedPhysion(Dataset):
 
             indices = indices.tolist()
 
-            frames = list(h5_file['frames'])
+            
 
             images = []
-
+            contact_check = False
+            contact_points = np.array([[-1, -1]])
             for i, frame in enumerate(frames):
                 if not i in indices:
                     continue
-                img = f['frames'][frame]['images']['_img_cam0'][:]
+                img = h5_file['frames'][frame]['images']['_img_cam0'][:]
                 img = Image.open(io.BytesIO(img)) # (256, 256, 3)
                 images.append(img)
+                
+                if len(images) >= self.video_len:
+                    break
             
-            contact_check = False
-            contact_points = None
-            for i, frame in enumerate(frames):
-                contacts = f['frames'][frame]['collisions']['contacts_ot']
+                contacts = h5_file['frames'][frame]['collisions']['contacts_ot']
                 if contacts.shape[0] == 0:
                     continue
-                contact_points = get_contact(f, frame)
-                contact_check = True
-                break
+                if not contact_check:
+                    contact_points = get_contact(h5_file, frame)
+                    contact_check = True
+                
+                    
+            if len(images) < self.video_len:
+                    images += [images[-1]] * (self.video_len - len(images))
                 
             ret['contacts'] = contact_points
 
@@ -155,13 +168,21 @@ class UnifiedPhysion(Dataset):
         return ret
     
 def get_contact(f, frame):
-    cam_matrix = f1['frames'][frame]['camera_matrices']['camera_matrix_cam0'][:]
+    cam_matrix = f['frames'][frame]['camera_matrices']['camera_matrix_cam0'][:]
     cam_matrix = cam_matrix.reshape(4, 4)
     proj_matrix = f['frames'][frame]['camera_matrices']['projection_matrix_cam0'][:]
     proj_matrix = proj_matrix.reshape(4, 4)
     contacts = proj_world_to_pixel(np.array(f['frames'][frame]['collisions']['contacts_ot'][()]), cam_matrix, proj_matrix)
     pts = np.array([[contacts[0][0], contacts[0][1]]])
     return pts
+
+def pad_ones(pts):
+    '''
+    pts: [N , K]
+    returns: [N, K+1]
+    '''
+    pw = np.concatenate([pts, np.ones([pts.shape[0], 1])], 1)
+    return pw
 
 def proj_world_to_pixel(pw, cam_matrix, proj_matrix):
     '''
@@ -180,4 +201,4 @@ def proj_world_to_pixel(pw, cam_matrix, proj_matrix):
     proj_pts[:, 1] = 1 - proj_pts[:, 1]
     proj_pts = proj_pts[:, [1, 0]]
     proj_pts = (proj_pts*128).astype(int)
-    return proj_pt
+    return proj_pts

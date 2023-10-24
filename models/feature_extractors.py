@@ -1,6 +1,13 @@
 import numpy as np
+import torch
 import torch.nn as nn
-import get_fourier_features
+
+from . import get_fourier_features
+from collections import OrderedDict
+from torchvision import transforms
+
+import torch.nn.functional as F
+
 
 class PhysionFeatureExtractor(nn.Module):
 
@@ -79,7 +86,7 @@ class DINOV2Base(DINOV2):
 class R3M_LSTM(PhysionFeatureExtractor):
     def __init__(self, weights_path):
         super().__init__()
-        from models.R3M.r3m_model import pfR3M_LSTM_physion, load_model
+        from R3M.r3m_model import pfR3M_LSTM_physion, load_model
         self.model = pfR3M_LSTM_physion()
         self.model = load_model(self.model, weights_path)
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -112,7 +119,7 @@ class R3M_LSTM(PhysionFeatureExtractor):
 class DINOV2_LSTM(PhysionFeatureExtractor):
     def __init__(self, weights_path):
         super().__init__()
-        from models.R3M.r3m_model import pfDINO_LSTM_physion, load_model
+        from R3M.r3m_model import pfDINO_LSTM_physion, load_model
         self.model = pfDINO_LSTM_physion()
         self.model = load_model(self.model, weights_path)
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -148,9 +155,9 @@ class MCVD(PhysionFeatureExtractor):
                  n_features=1, 
                  n_context=13):
         super().__init__()
-        from models.mcvd_pytoch.load_model_from_ckpt import load_model, get_readout_sampler, init_samples
-        from models.mcvd_pytoch.datasets import data_transform
-        from models.mcvd_pytoch.runners.ncsn_runner import conditioning_fn
+        from mcvd_pytoch.load_model_from_ckpt import load_model, get_readout_sampler, init_samples
+        from mcvd_pytoch.datasets import data_transform
+        from mcvd_pytoch.runners.ncsn_runner import conditioning_fn
         device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
         # load model
         self.scorenet, self.config = load_model(weights_path, device)
@@ -217,29 +224,41 @@ class FITVID(PhysionFeatureExtractor):
     # input is (Bs, T, 3, H, W)
     def __init__(self, weights_path, n_past=7):
         super().__init__()
-        from models.FITVID import FitVid
+        from models.FitVid import fitvid
+        
         # IMPORTANT: n_past decides if OCP or OCD
-        model = FitVid(n_past=n_past, train=False)
-        params = torch.load(self.model_path, map_location="cpu")
+        model = fitvid.FitVid(n_past=n_past, train=False)
+        params = torch.load(weights_path, map_location="cpu")
 
         new_sd = OrderedDict()
         for k, v in params.items():
             name = k[7:] if k.startswith("module.") else k
             new_sd[name] = v
         model.load_state_dict(new_sd)
-        print(f"Loaded parameters from {self.model_path}")
+        print(f"Loaded parameters from {weights_path}")
 
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model = model.to(device)
-        self.data_transform = transforms.Compose(
-                        [transforms.Resize(64), transforms.ToTensor(),])
+        self.model.eval()
+    
+
+    def transform_video_tensor(self, video):
+        # Ensure video tensor is in shape (T, C, H, W)
+        video = video.permute(0, 3, 1, 2)
+
+        # Resize using F.interpolate
+        transformed_video = F.interpolate(video, size=(64, 64))
+
+        return transformed_video
 
 
     def extract_features(self, videos):
-        videos = torch.stack([self.data_transform(img) for img in videos])
-        output = self.model(videos)
+        videos = torch.stack([self.transform_video_tensor(vid) for vid in videos])
+        videos = videos.to('cuda')
+        with torch.no_grad():
+            output = self.model(videos)
         features = output['h_preds']
-        features = features.reshape(mid.shape[0], -1, 32)
+        features = features.unsqueeze(2)#(features.shape[0], -1, 32)
         patch_size = int(np.sqrt(features.shape[1]))
         features = features.reshape(features.shape[0], patch_size, patch_size, -1)
         return get_fourier_features(features)
@@ -253,6 +272,7 @@ class Extractor(nn.Module):
                  n_past=7, 
                  model_type='physion',
                  n_features=1):
+        super(Extractor, self).__init__()
         self.model = None
         if model_name == 'fitvid':
             self.model = FITVID(weights_path, 
