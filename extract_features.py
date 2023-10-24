@@ -21,11 +21,14 @@ def main(args):
                      )
 
     print('load data')
-    dataset = UnifiedPhysion(args.data_path, frame_duration=args.frame_duration,
-                            ocd= args.task == 'ocd', video_len = args.video_len)
+    dataset = UnifiedPhysion(args.data_path, 
+                             frame_duration=args.frame_duration,
+                             ocd= args.task == 'ocd_cwm', 
+                             video_len = args.video_len,
+                             n_context= args.n_past)
     loader = DataLoader(dataset, batch_size=args.batch_size, 
                         shuffle=False, num_workers=8)
-    print(loader.num_workers)  # This will print "4" in this example
+    #print(loader.num_workers)  # This will print "8" in this example
 
     data_size = len(loader)#5608
         
@@ -45,10 +48,10 @@ def main(args):
         filename += batch['filename']
         # input is (Bs, T, 3, H, W)
         t = time.time()
-        if args.task == 'ocp':
-            output = model.extract_features(videos)
-        else:
+        if args.task == 'ocd':
             output = model.extract_features_ocd(videos)
+        else:
+            output = model.extract_features(videos)
         t1 = time.time()
         print(t1 - t)
         features_dset += [output]

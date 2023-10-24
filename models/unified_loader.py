@@ -69,7 +69,8 @@ class UnifiedPhysion(Dataset):
     def __init__(self, hdf5_path, 
                  frame_duration=150, 
                  ocd=False,
-                 video_len = 25
+                 video_len = 25,
+                 n_context = 13
                  ):
 
         if 'test_consolidated' in hdf5_path:
@@ -98,6 +99,8 @@ class UnifiedPhysion(Dataset):
         self.ocd = ocd
         
         self.video_len = video_len
+        
+        self.n_context = n_context
 
     def __len__(self):
         return len(self.all_hdf5)
@@ -117,20 +120,21 @@ class UnifiedPhysion(Dataset):
             frames = list(h5_file['frames'])
             
             if self.ocd:
-                indices = np.arange(frame_label - 2*self.frame_gap, 
-                                    frame_label + 3*self.frame_gap, 
-                                    self.frame_gap).clip(0, video_len - 1)
+                window = self.n_context / 2
+                indices = np.arange(frame_label - (window - 1)*self.frame_gap, 
+                                    frame_label + window*self.frame_gap, 
+                                    self.frame_gap).clip(0, len(frames) - 1)
             else:
                 indices = np.arange(0, len(frames), self.frame_gap)
                 
-            if 'collide' in filename:
-                # print("file is collide", filename)
-                index_start = int(300 / self.frame_duration)
-                for i in range(0, indices.shape[0])[::-1]:
-                    if i > index_Start:
-                        indices[i] = indices[i - index_start]
-                    else:
-                        indices[i] = 0
+                if 'collide' in filename:
+                    # print("file is collide", filename)
+                    index_start = int(300 / self.frame_duration)
+                    for i in range(0, indices.shape[0])[::-1]:
+                        if i > index_Start:
+                            indices[i] = indices[i - index_start]
+                        else:
+                            indices[i] = 0
 
             indices = indices.tolist()
 

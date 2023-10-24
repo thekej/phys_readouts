@@ -5,16 +5,16 @@ import torchvision.transforms as transforms
 from torchvision.datasets import CIFAR10, LSUN
 from torch.utils.data import DataLoader
 
-from datasets.celeba import CelebA
+from .celeba import CelebA
 # from datasets.ffhq import FFHQ
-from datasets.imagenet import ImageNetDataset
-from datasets.moving_mnist import MovingMNIST
-from datasets.stochastic_moving_mnist import StochasticMovingMNIST
-from datasets.bair import BAIRDataset
-from datasets.kth import KTHDataset
-from datasets.cityscapes import CityscapesDataset
-from datasets.ucf101 import UCF101Dataset
-from datasets.ego4d import EGO4Dataset
+from .imagenet import ImageNetDataset
+from .moving_mnist import MovingMNIST
+from .stochastic_moving_mnist import StochasticMovingMNIST
+from .bair import BAIRDataset
+from .kth import KTHDataset
+from .cityscapes import CityscapesDataset
+from .ucf101 import UCF101Dataset
+from .ego4d import EGO4Dataset
 from torch.utils.data import Subset
 
 

@@ -15,7 +15,7 @@ import yaml
 # from hanging_threads import start_monitoring
 # start_monitoring(seconds_frozen=10, test_interval=100)
 
-from runners import *
+from .runners import *
 
 def parse_args_and_config():
     parser = argparse.ArgumentParser(description=globals()['__doc__'])

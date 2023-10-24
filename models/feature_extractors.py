@@ -149,15 +149,16 @@ class DINOV2_LSTM(PhysionFeatureExtractor):
         return get_fourier_features(features)
     
     
+from models.mcvd_pytorch.load_model_from_ckpt import load_model, get_readout_sampler, init_samples
+from models.mcvd_pytorch.datasets import data_transform
+from models.mcvd_pytorch.runners.ncsn_runner import conditioning_fn
+    
 class MCVD(PhysionFeatureExtractor):
     def __init__(self, weights_path, 
                  model_type='physion',
                  n_features=1, 
                  n_context=13):
         super().__init__()
-        from mcvd_pytoch.load_model_from_ckpt import load_model, get_readout_sampler, init_samples
-        from mcvd_pytoch.datasets import data_transform
-        from mcvd_pytoch.runners.ncsn_runner import conditioning_fn
         device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
         # load model
         self.scorenet, self.config = load_model(weights_path, device)
@@ -165,13 +166,19 @@ class MCVD(PhysionFeatureExtractor):
         self.sampler = get_readout_sampler(self.config)
         self.n_features = n_features
         self.n_context = n_context
-        self.data_transform = transforms.Compose(
-                                [transforms.Resize(64), 
-                                 transforms.ToTensor(),])
+        self.model_type = model_type
 
+    def transform_video_tensor(self, video):
+        # Ensure video tensor is in shape (T, C, H, W)
+        video = video.permute(0, 3, 1, 2)
+
+        # Resize using F.interpolate
+        transformed_video = F.interpolate(video, size=(64, 64))
+
+        return transformed_video
 
     def extract_features(self, videos):
-        videos = torch.stack([self.data_transform(img) for img in videos])
+        videos = torch.stack([self.transform_video_tensor(vid) for vid in videos])
         input_frames = data_transform(self.config, videos)
         if self.model_type == 'ucf':
             real, cond, cond_mask = conditioning_fn(self.config, input_frames[:, 8:16, :, :, :],
@@ -184,23 +191,31 @@ class MCVD(PhysionFeatureExtractor):
                                                     prob_mask_cond=getattr(self.config.data, 'prob_mask_cond', 0.0),
                                                     prob_mask_future=getattr(self.config.data, 'prob_mask_future', 0.0))
         init = init_samples(len(real), self.config)
-        pred, gamma, beta, mid = self.sampler(init, self.scorenet, cond=cond,
+        with torch.no_grad():
+            pred, gamma, beta, mid = self.sampler(init, self.scorenet, cond=cond,
                                          cond_mask=cond_mask,
-                                         subsample=100, verbose=True)
+                                         subsample=10, verbose=True)
         #TODO: Add FFT aggregation
-        feature = mid.numpy()
-        features = features.reshape(mid.shape[0], -1, 32)
-        patch_size = int(np.sqrt(features.shape[1]))
-        features = features.reshape(features.shape[0], patch_size, patch_size, -1)
+        features = mid.permute(0, 2, 3, 1)
+        features = features.reshape(features.shape[0], 32, 32, 48)
         return get_fourier_features(features)
 
     def extract_features_ocd(self, videos):
-        videos = torch.stack([self.data_transform(img) for img in videos])
+        videos = torch.stack([self.transform_video_tensor(vid) for vid in videos])
         input_frames = data_transform(self.config, videos)
         output = []
         for j in range(self.n_features):
-            real, cond, cond_mask = conditioning_fn(config, input_frames[:, 4*j:4*j+8, :, :, :], 
+            if self.model_type == 'ucf':
+                real, cond, cond_mask = conditioning_fn(config, input_frames[:, 4*j:4*j+8, :, :, :], 
                                                     num_frames_pred=config.data.num_frames,
+                                        prob_mask_cond=getattr(config.data, 'prob_mask_cond', 0.0),
+                                        prob_mask_future=getattr(config.data, 'prob_mask_future', 0.0))
+            else:
+                real, cond, cond_mask = conditioning_fn(config, 
+                                                    input_frames[:, 
+                                                    j:j+config.data.num_frames_cond+config.data.num_frames, 
+                                                    :, :, :], 
+                                        num_frames_pred=config.data.num_frames,
                                         prob_mask_cond=getattr(config.data, 'prob_mask_cond', 0.0),
                                         prob_mask_future=getattr(config.data, 'prob_mask_future', 0.0))
 
@@ -211,13 +226,11 @@ class MCVD(PhysionFeatureExtractor):
                                              subsample=args.sub, 
                                              verbose=True)
             #TODO: Add FFT aggregation
-            
-            output +=  [mid.numpy()]
-        features = np.stack(features, dim=1)
-        features = features.reshape(mid.shape[0], -1, 32)
-        patch_size = int(np.sqrt(features.shape[1]))
-        features = features.reshape(features.shape[0], patch_size, patch_size, -1)
-        return get_fourier_features(features)
+            features = mid
+            features = mid.permute(0, 2, 3, 1)
+            features = features.reshape(features.shape[0], 32, 32, 48)
+            output +=  [get_fourier_features(features)]
+        return np.stack(output)
 
 
 class FITVID(PhysionFeatureExtractor):

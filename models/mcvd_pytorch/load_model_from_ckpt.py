@@ -17,11 +17,11 @@ except:
     from torchvision.transforms.functional import resize
     interp = 0
 
-from datasets import get_dataset, data_transform, inverse_data_transform
-from main import dict2namespace
-from models import get_sigmas, anneal_Langevin_dynamics, anneal_Langevin_dynamics_consistent, ddpm_sampler, ddim_sampler, FPNDM_sampler
-from models.ema import EMAHelper
-from runners.ncsn_runner import get_model
+from .datasets import get_dataset, data_transform, inverse_data_transform
+from .main import dict2namespace
+from .models import get_sigmas, anneal_Langevin_dynamics, anneal_Langevin_dynamics_consistent, ddpm_sampler, ddim_sampler, FPNDM_sampler
+from .models.ema import EMAHelper
+from .runners.ncsn_runner import get_model
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 # device = torch.device('cpu')
