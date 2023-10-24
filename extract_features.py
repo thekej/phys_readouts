@@ -6,8 +6,7 @@ import tqdm
 import h5py
 import torch 
 
-from models import Extractor
-from fitvid_loader import ReadoutDataset
+from models import Extractor, UnifiedPhysion
 from torch.utils.data import Dataset, DataLoader
 from collections import OrderedDict
 
@@ -21,26 +20,26 @@ def main(args):
                      )
 
     print('load data')
-    dataset = ReadoutDataset(args.data_path)
+    dataset = UnifiedPhysion(args.data_path, frame_duration=args.frame_duration,
+                            ocd=args.ocd, video_len = args.video_len)
     loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False)
     data_size = len(loader)#5608
-    #for b in loader:
-    #    v_in, label_in = b
-    #    data_size += v_in.shape[0]
         
-    n_features = 10
     # set up new dataset
     label_dset = []
     contacts_dset = []
     features_dset = []
+    filename = []
 
     print('start extraction')
     for i, batch in enumerate(tqdm.tqdm(loader)):
-        videos, labels, contacts = batch
+        videos, labels, contacts = batch['video'], batch['label'], batch['contacts']
+        
         videos = videos.to('cuda')
         
         label_dset += [labels.reshape(-1)]
         contacts_dset += [contacts]
+        filename += batch['filename']
         # input is (Bs, T, 3, H, W)
         
         if args.task == 'ocp':
@@ -48,7 +47,16 @@ def main(args):
         else:
             output = model.extract_features_ocd(videos)
 
-        features_dset += [out]
+        features_dset += [output]
+
+
+    with h5py.File(args.save_file, "w") as hf:
+        hf.create_dataset("features", data=np.array(features_dset, dtype=float))
+        hf.create_dataset("labels", data=np.array(label_dset, dtype=float))
+        hf.create_dataset("contacts", data=np.array(contacts_dset, dtype=int))
+        dt = h5py.string_dtype(encoding='utf-8')
+        hf.create_dataset("stimuli_name", data=np.array(filename, dtype=dt))
+
 
 
 if __name__ == '__main__':
