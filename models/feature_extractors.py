@@ -100,11 +100,8 @@ class R3M_LSTM(PhysionFeatureExtractor):
     def extract_features(self, videos):
         videos = torch.stack([self.data_transform(img) for img in videos])
         output = model(videos)
-        features = output["input_states"].detach().cpu().numpy()
-        features = features.view(features.shape[0], -1, 32)
-        patch_size = int(np.sqrt(features.shape[1]))
-        features = features.view(features.shape[0], patch_size, patch_size, -1)
-        return get_fourier_features(features)
+        features = output["input_states"].detach().cpu()
+        return features
 
     def extract_features_ocd(self, img):
         videos = torch.stack([self.data_transform(img) for img in videos])
@@ -133,11 +130,8 @@ class DINOV2_LSTM(PhysionFeatureExtractor):
     def extract_features(self, videos):
         videos = torch.stack([self.data_transform(img) for img in videos])
         output = model(videos)
-        features = output["input_states"].detach().cpu().numpy()
-        features = features.reshape(features.shape[0], -1, 32)
-        patch_size = int(np.sqrt(features.shape[1]))
-        features = features.reshape(features.shape[0], patch_size, patch_size, -1)
-        return get_fourier_features(features)
+        features = output["input_states"].detach().cpu()
+        return features
 
     def extract_features_ocd(self, videos):
         videos = torch.stack([self.data_transform(img) for img in videos])
@@ -195,10 +189,7 @@ class MCVD(PhysionFeatureExtractor):
             pred, gamma, beta, mid = self.sampler(init, self.scorenet, cond=cond,
                                          cond_mask=cond_mask,
                                          subsample=100, verbose=True)
-        #TODO: Add FFT aggregation
-        features = mid.permute(0, 2, 3, 1)
-        features = features.reshape(features.shape[0], 32, 32, 48)
-        return get_fourier_features(features)
+        return mid
 
     def extract_features_ocd(self, videos):
         videos = torch.stack([self.transform_video_tensor(vid) for vid in videos])
@@ -206,20 +197,20 @@ class MCVD(PhysionFeatureExtractor):
         output = []
         for j in range(self.n_features):
             if self.model_type == 'ucf':
-                real, cond, cond_mask = conditioning_fn(config, input_frames[:, 4*j:4*j+8, :, :, :], 
-                                                    num_frames_pred=config.data.num_frames,
-                                        prob_mask_cond=getattr(config.data, 'prob_mask_cond', 0.0),
-                                        prob_mask_future=getattr(config.data, 'prob_mask_future', 0.0))
+                real, cond, cond_mask = conditioning_fn(self.config, input_frames[:, 4*j:4*j+8, :, :, :], 
+                                                    num_frames_pred=self.config.data.num_frames,
+                                        prob_mask_cond=getattr(self.config.data, 'prob_mask_cond', 0.0),
+                                        prob_mask_future=getattr(self.config.data, 'prob_mask_future', 0.0))
             else:
-                real, cond, cond_mask = conditioning_fn(config, 
+                real, cond, cond_mask = conditioning_fn(self.config, 
                                                     input_frames[:, 
-                                                    j:j+config.data.num_frames_cond+config.data.num_frames, 
+                                                    j:j+self.config.data.num_frames_cond+self.config.data.num_frames, 
                                                     :, :, :], 
-                                        num_frames_pred=config.data.num_frames,
-                                        prob_mask_cond=getattr(config.data, 'prob_mask_cond', 0.0),
-                                        prob_mask_future=getattr(config.data, 'prob_mask_future', 0.0))
+                                        num_frames_pred=self.config.data.num_frames,
+                                        prob_mask_cond=getattr(self.config.data, 'prob_mask_cond', 0.0),
+                                        prob_mask_future=getattr(self.config.data, 'prob_mask_future', 0.0))
 
-            init = init_samples(len(real), config)
+            init = init_samples(len(real), self.config)
             pred, gamma, beta, mid = sampler(init, scorenet, 
                                              cond=cond, 
                                              cond_mask=cond_mask, 
@@ -271,12 +262,14 @@ class FITVID(PhysionFeatureExtractor):
         with torch.no_grad():
             output = self.model(videos)
         features = output['h_preds']
+        return features
+
+    def extract_features_ocd(self, videos): 
+        features = output['h_preds']
         features = features.unsqueeze(2)#(features.shape[0], -1, 32)
         patch_size = int(np.sqrt(features.shape[1]))
         features = features.reshape(features.shape[0], patch_size, patch_size, -1)
-        return get_fourier_features(features)
-
-    def extract_features_ocd(self, videos):
+        get_fourier_features(features)
         return self.extract_features(videos)
     
 class Extractor(nn.Module):
