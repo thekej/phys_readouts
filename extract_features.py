@@ -30,7 +30,7 @@ def main(args):
                         shuffle=False, num_workers=8)
     #print(loader.num_workers)  # This will print "8" in this example
 
-    data_size = len(loader)#5608
+    data_size = len(loader)
         
     # set up new dataset
     label_dset = []
@@ -45,7 +45,7 @@ def main(args):
         
         label_dset += [labels.reshape(-1)]
         contacts_dset += [contacts]
-        filename += batch['filename']
+        filename += [batch['filename']]
         # input is (Bs, T, 3, H, W)
         t = time.time()
         if args.task == 'ocd':
@@ -54,15 +54,21 @@ def main(args):
             output = model.extract_features(videos)
         t1 = time.time()
         print(t1 - t)
-        features_dset += [output]
-
+        features_dset += [output.cpu().numpy()]
+        
+    features_dset = np.concatenate(features_dset, axis=0)
+    label_dset = np.concatenate(label_dset, axis=0)
+    contacts_dset = np.concatenate(contacts_dset, axis=0)
+    filename = np.concatenate(filename, axis=0)
 
     with h5py.File(args.save_file, "w") as hf:
-        hf.create_dataset("features", data=np.array(features_dset, dtype=float))
-        hf.create_dataset("labels", data=np.array(label_dset, dtype=float))
-        hf.create_dataset("contacts", data=np.array(contacts_dset, dtype=int))
-        dt = h5py.string_dtype(encoding='utf-8')
-        hf.create_dataset("stimuli_name", data=np.array(filename, dtype=dt))
+        hf.create_dataset("features", data=features_dset)
+        hf.create_dataset("labels", data=label_dset)
+        hf.create_dataset("contacts", data=contacts_dset)
+        #hf.create_dataset("stimuli_name", data=filename)
+        dt = h5py.special_dtype(vlen=str)  # This specifies a variable-length string
+        dset = hf.create_dataset("stimuli_name", (len(filename),), dtype=dt)
+        dset[:] = filename
 
 
 

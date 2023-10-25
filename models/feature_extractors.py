@@ -194,7 +194,7 @@ class MCVD(PhysionFeatureExtractor):
         with torch.no_grad():
             pred, gamma, beta, mid = self.sampler(init, self.scorenet, cond=cond,
                                          cond_mask=cond_mask,
-                                         subsample=10, verbose=True)
+                                         subsample=100, verbose=True)
         #TODO: Add FFT aggregation
         features = mid.permute(0, 2, 3, 1)
         features = features.reshape(features.shape[0], 32, 32, 48)
@@ -230,7 +230,7 @@ class MCVD(PhysionFeatureExtractor):
             features = mid.permute(0, 2, 3, 1)
             features = features.reshape(features.shape[0], 32, 32, 48)
             output +=  [get_fourier_features(features)]
-        return np.stack(output)
+        return np.stack(output, axis=1)
 
 
 class FITVID(PhysionFeatureExtractor):

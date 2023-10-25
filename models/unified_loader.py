@@ -58,11 +58,11 @@ def get_label(f):
         for key in h5file['frames'].keys():
             lbl = np.array(h5file['frames'][key]['labels']['target_contacting_zone']).item()
             if lbl:
-                return int(key), True
+                return int(key), 1# True
 
         ind = len(h5file['frames'].keys()) // 2
 
-        return ind, False
+        return ind, 0# False
 
 class UnifiedPhysion(Dataset):
 
