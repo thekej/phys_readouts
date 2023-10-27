@@ -120,9 +120,10 @@ class UnifiedPhysion(Dataset):
             frames = list(h5_file['frames'])
             
             if self.ocd:
+                
                 window = self.n_context / 2
                 indices = np.arange(frame_label - (window - 1)*self.frame_gap, 
-                                    frame_label + window*self.frame_gap, 
+                                    frame_label + (window+1)*self.frame_gap, 
                                     self.frame_gap).clip(0, len(frames) - 1)
             else:
                 indices = np.arange(0, len(frames), self.frame_gap)
@@ -131,7 +132,7 @@ class UnifiedPhysion(Dataset):
                     # print("file is collide", filename)
                     index_start = int(300 / self.frame_duration)
                     for i in range(0, indices.shape[0])[::-1]:
-                        if i > index_Start:
+                        if i > index_start:
                             indices[i] = indices[i - index_start]
                         else:
                             indices[i] = 0

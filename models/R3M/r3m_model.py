@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
-from r3m import load_r3m
+from .r3m import load_r3m
 from torchvision import transforms
 from collections import OrderedDict
 
@@ -137,7 +137,7 @@ class FrozenPretrainedEncoder(nn.Module):
             label_images = x[:, self.n_past :]
             rollout_steps = label_images.shape[1]
         else:
-            label_images = x[:, self.n_past]
+            label_images = x[:, -1]#self.n_past]
             rollout_steps = 1
 
         observed_states = self.get_encoder_feats(label_images)

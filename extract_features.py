@@ -79,7 +79,7 @@ if __name__ == '__main__':
     parser.add_argument('--model_type', type=str, default='physion')
     parser.add_argument('--task', type=str, default='ocp')
     parser.add_argument('--n_past', type=int, required=True)
-    parser.add_argument('--n_features', type=int, default=1)
+    parser.add_argument('--n_features', type=int, default=13)
     parser.add_argument('--frame_duration', type=int, default=60)
     parser.add_argument('--video_len', type=int, default=25)
     parser.add_argument('--data_path', type=str, required=True)

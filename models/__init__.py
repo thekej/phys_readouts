@@ -60,3 +60,39 @@ def get_fourier_features(feats):
     combined_features_uncond = torch.cat([real_imag, mean, std, skew, kurt], dim=1)
 
     return combined_features_uncond
+
+import torch.nn.functional as F
+
+class VideoTransform:
+    def __init__(self):
+        pass
+
+    def resize(self, tensor, size):
+        # Resize using F.interpolate
+        # This function can handle batched input, so no need to loop
+        return F.interpolate(tensor, size=size, mode="bilinear", align_corners=False)
+
+    def center_crop(self, tensor, output_size):
+        # Center crop function for tensors for batched input
+        th, tw = output_size
+        h, w = tensor.shape[-2:]
+        i = int(round((h - th) / 2.))
+        j = int(round((w - tw) / 2.))
+        return tensor[..., i:i+th, j:j+tw]
+
+    def __call__(self, batch):
+        # Assuming batch shape is (bs, T, h, w, C)
+        batch = batch.float()  # Ensure the batch is of float32 datatype
+        
+        # Convert the batch from (bs, T, h, w, C) to (bs*T, C, h, w)
+        batch_size, T, h, w, C = batch.shape
+        batch = batch.permute(0, 1, 4, 2, 3).reshape(-1, C, h, w)
+
+        # Apply resizing
+        batch = self.resize(batch, (256, 256))
+        # Apply center cropping
+        batch = self.center_crop(batch, (224, 224))
+
+        # Reshape the batch back to (bs, T, C, h', w')
+        batch = batch.reshape(batch_size, T, C, 224, 224)
+        return batch
