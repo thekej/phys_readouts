@@ -124,7 +124,7 @@ class FrozenPretrainedEncoder(nn.Module):
             dynamics_kwargs["n_past"] = self.n_past
         self.dynamics = Dynamics(**dynamics_kwargs)
 
-    def forward(self, x):
+    def forward(self, x, n_past=None):
         # set frozen pretrained encoder to eval mode
         self.encoder.eval()
         # x is (Bs, T, 3, H, W)
@@ -137,7 +137,7 @@ class FrozenPretrainedEncoder(nn.Module):
             label_images = x[:, self.n_past :]
             rollout_steps = label_images.shape[1]
         else:
-            label_images = x[:, -1]#self.n_past]
+            label_images = x[:, self.n_past]
             rollout_steps = 1
 
         observed_states = self.get_encoder_feats(label_images)

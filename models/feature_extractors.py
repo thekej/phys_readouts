@@ -201,39 +201,22 @@ class FITVID(PhysionFeatureExtractor):
         self.model.eval()
         
     def transform(self):
-        return DataAugmentationForVideoMAE(False, 224), 60, 25
-    
-
-    def transform_video_tensor(self, video):
-        # Ensure video tensor is in shape (T, C, H, W)
-        video = video.permute(0, 3, 1, 2)
-
-        # Resize using F.interpolate
-        transformed_video = F.interpolate(video, size=(64, 64))
-
-        return transformed_video
-
+        return DataAugmentationForVideoMAE(False, 64), 60, 25
 
     def extract_features(self, videos):
-        videos = torch.stack([self.transform_video_tensor(vid) for vid in videos])
-        videos = videos.to('cuda')
         with torch.no_grad():
-            output = self.model(videos)
+            output = self.model(videos, n_past=7)
         features = output['h_preds']
         return features
 
     def extract_features_ocd(self, videos): 
+        with torch.no_grad():
+            output = self.model(videos, n_past=videos.shape[1])
         features = output['h_preds']
-        features = features.unsqueeze(2)#(features.shape[0], -1, 32)
-        patch_size = int(np.sqrt(features.shape[1]))
-        features = features.reshape(features.shape[0], patch_size, patch_size, -1)
-        get_fourier_features(features)
-        return self.extract_features(videos)
+        features = features.reshape(features.shape[0], 4, 4, -1)
+        features = get_fourier_features(features)
+        return features
 
-class FITVID_OCD(FITVID):
-    def __init__(self, weights_path):
-        super().__init__(weights_path, n_past=25)
-    
 class Extractor(nn.Module):
     def __init__(self, model_name, 
                  weights_path,

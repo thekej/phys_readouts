@@ -449,8 +449,10 @@ class FitVid(nn.Module):
             for k,v in skips.items()}
         return skips
 
-    def forward(self, video, actions=None):
+    def forward(self, video, actions=None, n_past=None):
         self.B, self.T = video.shape[:2]
+        if n_past is not None:
+            self.n_past = n_past
         if video.dtype == torch.uint8:
             video = video.to(torch.float32) / 255.0
         pred_s = self.frame_predictor.init_states(self.B, video.device)
