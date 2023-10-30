@@ -22,6 +22,8 @@ def load_model(
             name = 'encoder.r3m.module.' + k[19:]  # remove 'module.' of dataparallel/DDP
         elif k.startswith("module.") and 'dynamics' in k:
             name = k[7:]
+        elif k.startswith("module."):
+            name = k[7:]
         else:
             name = k
         new_sd[name] = v
