@@ -33,7 +33,7 @@ class PhysionFeatureExtractor(nn.Module):
         
 
 class R3M_LSTM(PhysionFeatureExtractor):
-    def __init__(self, weights_path, n_past=7, full_rollout=False):
+    def __init__(self, weights_path, n_past=7, full_rollout=True):
         from models.R3M.r3m_model import pfR3M_LSTM_physion, load_model 
         super().__init__()
         self.model = pfR3M_LSTM_physion(n_past=n_past, full_rollout=full_rollout)
@@ -54,19 +54,10 @@ class R3M_LSTM(PhysionFeatureExtractor):
         with torch.no_grad():
             output = self.model(videos)
         features = output["observed_states"]
-        features = features.reshape(features.shape[0], -1, 32)
-        patch_size = int(np.sqrt(features.shape[1]))
-        features = features.reshape(features.shape[0], patch_size, patch_size, -1)
-        return get_fourier_features(features)
-
-
-class R3M_LSTM_OCD(R3M_LSTM):
-    def __init__(self, weights_path):
-        super().__init__(weights_path, n_past=25, full_rollout=True)    
 
 
 class DINOV2_LSTM(PhysionFeatureExtractor):
-    def __init__(self, weights_path,n_past=7, full_rollout=False):
+    def __init__(self, weights_path,n_past=7, full_rollout=True):
         super().__init__()
         from models.R3M.r3m_model import pfDINO_LSTM_physion, load_model
         self.model = pfDINO_LSTM_physion(n_past=n_past, full_rollout=full_rollout)
@@ -80,22 +71,13 @@ class DINOV2_LSTM(PhysionFeatureExtractor):
     def extract_features(self, videos):
         with torch.no_grad():
             output = self.model(videos[:, -self.model.n_past:])
-        features = output["input_states"].detach().cpu()
+        features = output["input_states"]
         return features
 
     def extract_features_ocd(self, videos):
         with torch.no_grad():
             output = self.model(videos)
-        features = output["observed_states"].detach().cpu().numpy()
-        features = features.reshape(features.shape[0], -1, 32)
-        patch_size = int(np.sqrt(features.shape[1]))
-        features = features.reshape(features.shape[0], patch_size, patch_size, -1)
-        return get_fourier_features(features)
-
-
-class DINOV2_LSTM_OCD(DINOV2_LSTM):
-    def __init__(self, weights_path):
-        super().__init__(weights_path, n_past=25, full_rollout=True)
+        return output["observed_states"]
 
 
 from models.mcvd_pytorch.load_model_from_ckpt import load_model, get_readout_sampler, init_samples
@@ -159,11 +141,7 @@ class MCVD(PhysionFeatureExtractor):
                 pred, gamma, beta, mid = self.sampler(init, self.scorenet, cond=cond,
                                          cond_mask=cond_mask,
                                          subsample=100, verbose=True)
-            #TODO: Add FFT aggregation
-            features = mid
-            features = mid.permute(0, 2, 3, 1)
-            features = features.reshape(features.shape[0], 32, 32, 48)
-            output +=  [get_fourier_features(features)]
+            output +=  [mid]
         return torch.stack(output, axis=1)
     
 class MCVD_PHYSION(MCVD):
@@ -213,36 +191,71 @@ class FITVID(PhysionFeatureExtractor):
         with torch.no_grad():
             output = self.model(videos, n_past=videos.shape[1])
         features = output['h_preds']
-        features = features.reshape(features.shape[0], 4, 4, -1)
-        features = get_fourier_features(features)
         return features
 
-class Extractor(nn.Module):
-    def __init__(self, model_name, 
-                 weights_path,
-                 n_past=7, 
-                 model_type='physion',
-                 n_features=1):
-        super(Extractor, self).__init__()
-        self.model = None
-        if model_name == 'fitvid':
-            self.model = FITVID(weights_path, 
-                                n_past=n_past)
-        elif model_name == 'mcvd':
-            self.model = MCVD(weights_path, 
-                              model_type=model_type,
-                              n_features=n_features,  
-                              n_context=n_past)
-        elif model_name == 'dino':
-            self.model = DINOV2(weights_path, model_name)
-        elif model_name == 'dino_lstm':
-            self.model = DINOV2_LSTM(weights_path)
-        elif model_name == 'r3m_lstm':
-            self.model = R3M_LSTM(weights_path)
-            
-            
+
+class ResNet50(PhysionFeatureExtractor):
+    def __init__(self, weights_path):
+
+        super().__init__()
+        from transformers import ResNetModel
+
+        self.model = ResNetModel.from_pretrained("microsoft/resnet-50")
+
+    def transform(self,):
+        return DataAugmentationForVideoMAE(
+            imagenet_normalize=True,
+            rescale_size=224,
+        ), 150, 4
+
+    def fwd(self, images):
+        '''
+        images: [B, C, H, W], Image is normalized with imagenet norm
+        '''
+        input_dict = {'pixel_values': images}
+
+        decoder_outputs = self.model(**input_dict, output_hidden_states=True)
+
+        features = decoder_outputs.last_hidden_state
+
+        return features
+
+
     def extract_features(self, videos):
-        return self.model.extract_features(videos)
+        '''
+        videos: [B, C, T, H, W], T is usually 4 and videos are normalized with imagenet norm
+        returns: [B, T, C, H, W] extracted features
+        '''
+
+        videos = videos[:, :4]
+        bs, num_frames, num_channels, h, w = videos.shape
+        videos = videos.flatten(0, 1)
+        features = self.fwd(videos)
+
+        features = features.reshape(bs, num_frames, features.shape[1], features.shape[2], features.shape[3])
+
+        return features
 
     def extract_features_ocd(self, videos):
-        return self.model.extract_features_ocd(videos)
+        '''
+        videos: [1, T, C, H, W], T is usually 4 and videos are normalized with imagenet norm
+        returns: [1, T, H, W, D] extracted features
+        '''
+
+        videos = videos.flatten(0, 1)
+        features = self.fwd(videos)
+
+        features = features.unsqueeze(0)
+
+        return features
+
+    def extract_features_for_seg(self, img):
+        '''
+        img: [B, C, H, W], Image is normalized with imagenet norm
+        returns: [B, H, W, D] extracted features
+        '''
+        feat = self.fwd(img)
+
+        feat = feat.permute(0, 2, 3, 1)
+
+        return feat
