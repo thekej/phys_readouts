@@ -66,7 +66,7 @@ class DINOV2_LSTM(PhysionFeatureExtractor):
         self.model = self.model.to(device)
         
     def transform(self):
-        return DataAugmentationForVideoMAE(False, 224), 60, 25
+        return DataAugmentationForVideoMAE(True, 224), 60, 25
 
     def extract_features(self, videos):
         with torch.no_grad():
