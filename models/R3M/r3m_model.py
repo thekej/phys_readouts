@@ -131,6 +131,9 @@ class FrozenPretrainedEncoder(nn.Module):
         self.encoder.eval()
         # x is (Bs, T, 3, H, W)
         assert len(x.shape) == 5
+        if x.shape[1] <= self.n_past:
+            self.n_past = -1
+        
         inputs = x[:, : self.n_past]
         input_states = self.get_encoder_feats(inputs)
 

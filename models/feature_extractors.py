@@ -33,14 +33,15 @@ class PhysionFeatureExtractor(nn.Module):
         
 
 class R3M_LSTM(PhysionFeatureExtractor):
-    def __init__(self, weights_path, n_past=7, full_rollout=True):
+    def __init__(self, weights_path, n_past=7, full_rollout=False):
         from models.R3M.r3m_model import pfR3M_LSTM_physion, load_model 
         super().__init__()
         self.model = pfR3M_LSTM_physion(n_past=n_past, full_rollout=full_rollout)
         self.model = load_model(self.model, weights_path)
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model = self.model.to(device)
-        
+        self.n_past = n_past
+
     def transform(self):
         return DataAugmentationForVideoMAE(False, 224), 60, 25
 
@@ -51,13 +52,21 @@ class R3M_LSTM(PhysionFeatureExtractor):
         return features
 
     def extract_features_ocd(self, videos):
+        if self.n_past > videos.shape[1]:
+            added_frames = self.n_past - videos.shape[1]
+            videos = torch.cat([videos] + [videos[:, -1]]*added_frames, axis=1)
         with torch.no_grad():
-            output = self.model(videos)
-        features = output["observed_states"]
+            output = self.model(videos, n_past=videos.shape[1])
+        features = torch.cat([output["input_states"], output["observed_states"]], axis=1)
+        return features
+
+class R3M_LSTM_OCD(R3M_LSTM):
+    def __init__(self, weights_path):
+        super().__init__(weights_path, full_rollout=True)
 
 
 class DINOV2_LSTM(PhysionFeatureExtractor):
-    def __init__(self, weights_path,n_past=7, full_rollout=True):
+    def __init__(self, weights_path,n_past=7, full_rollout=False):
         super().__init__()
         from models.R3M.r3m_model import pfDINO_LSTM_physion, load_model
         self.model = pfDINO_LSTM_physion(n_past=n_past, full_rollout=full_rollout)
@@ -124,6 +133,9 @@ class MCVD(PhysionFeatureExtractor):
     def extract_features_ocd(self, videos):
         #videos = torch.stack([self.transform_video_tensor(vid) for vid in videos])
         input_frames = data_transform(self.config, videos)
+        if self.config.data.num_frames_cond+self.config.data.num_frames > videos.shape[1]:
+            added_frames = self.config.data.num_frames_cond+self.config.data.num_frames - videos.shape[1]
+            input_frames = torch.cat([input_frames] + [input_frames[:, -1]]*added_frames, axis=1)
         output = []
         for j in range(0, videos.shape[1], self.config.data.num_frames_cond+self.config.data.num_frames):
             if j + self.config.data.num_frames_cond+self.config.data.num_frames > videos.shape[1]:
