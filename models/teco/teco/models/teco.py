@@ -91,7 +91,6 @@ class TECO(nn.Module):
         deter = self.temporal_transformer(
             z_embeddings, actions, cond, deterministic=True
         )
-        deter = deter[:, -1]
         return deter
     
     def _init_mask(self):

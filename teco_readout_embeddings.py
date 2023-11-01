@@ -42,35 +42,89 @@ def main(args):
     data_size = args.size
     
     # set up new dataset
-    f = h5py.File(args.save_file, "w")
+    #f = h5py.File(args.save_file, "w")
     
     n_features = args.seq_len
     
-    dset1 = f.create_dataset("label", (data_size,), dtype='f')
-    if args.embeddings != 'h':
-        dset2 = f.create_dataset("features_x", (data_size, n_features, 16, 16), dtype='f')
-        dset3 = f.create_dataset("features_z", (data_size, n_features, 8, 8, 8), dtype='f')
-        dset4 = f.create_dataset("features_h", (data_size, n_features - args.open_loop_ctx, 8, 8, 8), dtype='f')
-    else:
-        dset2 = f.create_dataset("features", (data_size, 1, 8, 8, 256), dtype='f')
+#    dset1 = f.create_dataset("label", (data_size,), dtype='f')
+    #if args.embeddings != 'h':
+    #    dset2 = f.create_dataset("features_x", (data_size, n_features, 16, 16), dtype='f')
+    #    dset3 = f.create_dataset("features_z", (data_size, n_features, 8, 8, 8), dtype='f')
+    #    dset4 = f.create_dataset("features_h", (data_size, n_features - args.open_loop_ctx, 8, 8, 8), dtype='f')
+    #else:
+    ocp = []
+    ocd = []
+    ocd_focused = []
+    labels = []
+    contacts = []
+    stimulus = []
+#    dset2 = f.create_dataset("features", (data_size, 1, 8, 8, 256), dtype='f')
 
     for i, batch in enumerate(tqdm.tqdm(loader)):
+        if i == 5:
+            break
+        c_in = batch['collision_ind'].reshape(-1)
+        contact_in = batch['contacts'].reshape(-1, 2)
         v_in = batch['video']
         act_in = batch['actions']
-        label_in = batch['label']
+        label_in = batch['label'].reshape(-1)
+        stim_in = batch['stimulus'].reshape(-1)
         
-        if (i+1)*args.batch_size < data_size:
-            dset1[i*args.batch_size:(i+1)*args.batch_size] = label_in.reshape(-1)
-        else:
-            dset1[i*args.batch_size:] = label_in.reshape(-1)
+        labels += [label_in]
+        contacts += [contact_in]
+        stimulus.extend(stim_in)
 
-        if args.embeddings == 'h':
-            h = readout_h_run(model, state, v_in, act_in, seed=args.seed)
-            if (i+1)*args.batch_size < data_size:
-                dset2[i*args.batch_size:(i+1)*args.batch_size]  = h.reshape(-1, 1, 8, 8, 256)
+        #if args.embeddings == 'h':
+        h = readout_h_run(model, state, v_in, act_in, seed=args.seed)
+        h = h.squeeze(1)
+        ocp += [h[:, :13]]
+        
+        for c in c_in:
+            if c + 7 > 201:
+                ocd_focused += [h[:,-12:]]
+            elif c - 6 < 0:
+                ocd_focused += [h[:,:12]]
             else:
-                dset2[i*args.batch_size:]  = h.reshape(-1, 1, 8, 8, 256)
+                ocd_focused += [h[:,c-6:c+6]]
             
+            
+            if c - 25 < 0:
+                feats = h[:, :50]
+            elif c + 25 > 201:
+                feats = h[:, -50:]
+            else:
+                feats = h[:, c-25:c+25]
+                
+            if feats.shape[1] < 50:
+                pad_width = ((0, 0), (0, 50 - feats.shape[1]), (0, 0), (0, 0), (0, 0))
+                # Pad the array
+                feats = np.pad(feats, pad_width, mode='constant', constant_values=0)
+
+            ocd += [feats]
+
+    dt = h5py.special_dtype(vlen=str)
+
+    print('save 1')
+    with h5py.File(args.save_path_ocp ,'w') as hf:
+        hf.create_dataset("features", data=np.concatenate(ocp))
+        hf.create_dataset("label", data=np.concatenate(labels))
+        hf.create_dataset("contacts", data=np.concatenate(contacts))  
+        hf.create_dataset("stimulus", data=stimulus, dtype=dt)
+     
+    print('save 2')
+    with h5py.File(args.save_path_ocd ,'w') as hf:
+        hf.create_dataset("features", data=np.concatenate(ocd))
+        hf.create_dataset("label", data=np.concatenate(labels))
+        hf.create_dataset("contacts", data=np.concatenate(contacts))  
+        hf.create_dataset("stimulus", data=stimulus, dtype=dt)
+        
+    print('save 3')
+    with h5py.File(args.save_path_focused ,'w') as hf:
+        hf.create_dataset("features", data=np.concatenate(ocd_focused))
+        hf.create_dataset("label", data=np.concatenate(labels))
+        hf.create_dataset("contacts", data=np.concatenate(contacts))  
+        hf.create_dataset("stimulus", data=stimulus, dtype=dt)
+        '''   
         else:
             x, z, h = readout_z_run(model, state, v_in, act_in, seed=args.seed,
                                     scenario=args.scenario, seq_len=args.seq_len,
@@ -95,20 +149,22 @@ def main(args):
                 dset2[i*args.batch_size:] = x.numpy()
                 dset3[i*args.batch_size:] = z.numpy()
                 dset4[i*args.batch_size:] = h.numpy()
-
+    print('max_con ', con)
     f.close()
-
+        '''
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--ckpt', type=str, required=True)
     parser.add_argument('--vqvae_ckpt', type=str, required=True)
     parser.add_argument('--data_path', type=str, required=True)
-    parser.add_argument('--save_file', type=str, required=True)
+    parser.add_argument('--save_path_ocp', type=str, required=True)
+    parser.add_argument('--save_path_focused', type=str, required=True)
+    parser.add_argument('--save_path_ocd', type=str, required=True)
     parser.add_argument('--embeddings', type=str, required=True)
     parser.add_argument('--scenario', type=str, default='past', required=True)
     parser.add_argument('--batch_size', type=int, default=64)
-    parser.add_argument('--seq_len', type=int, choices=[25, 42, 50])
+    parser.add_argument('--seq_len', type=int, required=True)
     parser.add_argument('--open_loop_ctx', type=int, default=7)
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--size', type=int)

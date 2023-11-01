@@ -55,17 +55,22 @@ def proj_world_to_pixel(pw, cam_matrix, proj_matrix):
 def get_label(f):
 #     try:
     with h5py.File(f) as h5file:
-        stimulus = f['static']['stimulus_name'][()]
-        for key in h5file['frames'].keys():
+        stimulus = h5file['static']['stimulus_name'][()]
+        counter = 0
+        for i, key in enumerate(h5file['frames'].keys()):
+            if not i % 4 == 0:
+                continue
+            counter += 1
             lbl = np.array(h5file['frames'][key]['labels']['target_contacting_zone']).item()
             if lbl:
                 contact = get_contact(h5file, key)
-                if 'collide' in stimulus:
-                    return int(key) + 7, True, contact
+                
+                if 'collide' in str(stimulus):
+                    return counter + 12, True, contact
                 else:
-                    return int(key), True, contact
+                    return counter, True, contact
 
-        ind = len(h5file['frames'].keys()) // 2
+        ind = len(h5file['frames'].keys()) // 8
 
         return ind, False, np.array([[-1, -1]])
 
@@ -91,7 +96,7 @@ def encode_image(x, model, state):
 
     return out
 
-def process_video(video_file, video_length, return_length_only=False, original_fps=100, new_fps=25):
+def process_video(video_file, original_fps=100, new_fps=25):
     with h5py.File(video_file, 'r') as f: # load ith hdf5 file from list
         frames = list(f['frames'])
         images = []
@@ -107,10 +112,10 @@ def process_video(video_file, video_length, return_length_only=False, original_f
             pil_image = jax.numpy.array(pil_image)
             images.append(pil_image)
 
-        action = np.zeros(video_length)
         stimulus = f['static']['stimulus_name'][()]
-        if 'collide' in stimulus:
+        if 'collide' in str(stimulus):
             images = 7 * [images[0]] + images
+        action = np.zeros(len(images))
     return images, action
 
 def main(args):
@@ -125,6 +130,7 @@ def main(args):
     dset2 = []#f.create_dataset("action", (len(videos), vid_len), dtype='i')
     dset3 = []#f.create_dataset("label", (len(videos),), dtype='i')
     dset4 = []#f.create_dataset("stimulus", (len(videos),), dtype='i')
+    dset5 = []
     stimulus_list = []
     
     # load model
@@ -140,38 +146,45 @@ def main(args):
     idx, video_idx = 0, 0
     for i in tqdm.tqdm(range(len(videos))):
         collision_ind, label, contact = get_label(videos[i])
-        images, actions = process_video(videos[i], vid_len, True)
+        images, actions = process_video(videos[i])
         encoded_images = []
         for j, im in enumerate(images):
             #if j < vid_len:
             p_encode = video_encode(im)
             encoded_images += [p_encode[1].squeeze(0)]
         if min_vid_len > len(encoded_images):
-            encoded_images += [p_encode[1].squeeze(0)] * (vid_len - len(encoded_images))
+            encoded_images += [p_encode[1].squeeze(0)] * (min_vid_len - len(encoded_images))
 
         encoded_images = np.stack(encoded_images)
-        
         dset1 += [encoded_images]
         dset2 += [actions]
         dset3 += [label]
         dset4 += [contact]
-        dset5 += [colision_ind]
-        stimulus_list += stimulus_map[str(stimulus)]
-     
+        dset5 += [collision_ind]
+        stimulus_list += [videos[i]]
+    
+    #pad the features along the first and second dimension to max size
+    max_dim = max([x.shape[0] for x in dset1])
+
+    dset1 = [
+    np.pad(arr, ((0, max_dim - arr.shape[0]), (0, 0), (0, 0)), mode='constant') 
+    for arr in dset1
+    ]
+
+    dset2 = [
+    np.pad(arr, ((0, max_dim - arr.shape[0])), mode='constant') 
+    for arr in dset2
+    ]
+        
     dt = h5py.special_dtype(vlen=str)
 
     with h5py.File(args.save_path ,'w') as hf:
-        hf.create_dataset("video", data=np.concatenate(dset1))
-        hf.create_dataset("action", data=np.concatenate(dset2))
+        hf.create_dataset("video", data=np.stack(dset1))
+        hf.create_dataset("action", data=np.stack(dset2))
         hf.create_dataset("label", data=np.array(dset3))
         hf.create_dataset("contacts", data=np.concatenate(dset4))  
         hf.create_dataset("collision_ind", data=np.array(dset5))  
         hf.create_dataset("stimulus", data=stimulus_list, dtype=dt)
-
-
-    with open(args.map_dir, 'w') as f:
-        import json
-        json.dump(stimulus_map, f)
 
 
 if __name__ == "__main__":
