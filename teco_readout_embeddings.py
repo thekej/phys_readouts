@@ -61,8 +61,6 @@ def main(args):
 #    dset2 = f.create_dataset("features", (data_size, 1, 8, 8, 256), dtype='f')
 
     for i, batch in enumerate(tqdm.tqdm(loader)):
-        if i == 5:
-            break
         c_in = batch['collision_ind'].reshape(-1)
         contact_in = batch['contacts'].reshape(-1, 2)
         v_in = batch['video']
