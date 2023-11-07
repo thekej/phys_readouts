@@ -107,7 +107,7 @@ class MCVD(PhysionFeatureExtractor):
         self.model_type = model_type
         
     def transform(self):
-        return DataAugmentationForVideoMAE(False, 64), 40, 25
+        return DataAugmentationForVideoMAE(False, 64), 40, 37
 
     def extract_features(self, videos):
         #videos = torch.stack([self.transform_video_tensor(vid) for vid in videos])
@@ -135,7 +135,7 @@ class MCVD(PhysionFeatureExtractor):
         input_frames = data_transform(self.config, videos)
         if self.config.data.num_frames_cond+self.config.data.num_frames > videos.shape[1]:
             added_frames = self.config.data.num_frames_cond+self.config.data.num_frames - videos.shape[1]
-            input_frames = torch.cat([input_frames] + [input_frames[:, -1]]*added_frames, axis=1)
+            input_frames = torch.cat([input_frames] + [input_frames[:, -1].unsqueeze(1)]*added_frames, axis=1)
         output = []
         for j in range(0, videos.shape[1], self.config.data.num_frames_cond+self.config.data.num_frames):
             if j + self.config.data.num_frames_cond+self.config.data.num_frames > videos.shape[1]:

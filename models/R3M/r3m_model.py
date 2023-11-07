@@ -16,9 +16,15 @@ def load_model(
 ):
     params = torch.load(model_path, map_location="cpu")
     sd = params
+    aran = False
+    if model_path == '/ccn2/u/thekej/R3M/ego4d+physionv1/checkpoint.pt':
+        aran = True
+        sd = sd['state_dict']
     new_sd = OrderedDict()
     for k, v in sd.items():
-        if k.startswith("module.") and 'r3m' in k:
+        if k.startswith("module.") and 'r3m' in k and aran:
+            name = 'encoder.r3m.' + k[19:]
+        elif k.startswith("module.") and 'r3m' in k and not aran:
             name = 'encoder.r3m.module.' + k[19:]  # remove 'module.' of dataparallel/DDP
         elif k.startswith("module.") and 'dynamics' in k:
             name = k[7:]

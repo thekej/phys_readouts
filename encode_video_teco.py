@@ -72,7 +72,7 @@ def main(args):
     videos = glob.glob(os.path.join(args.data_dir, "**/*.hdf5"))
     corrupt = glob.glob(os.path.join(args.data_dir, '**/temp.hdf5'))
     videos = list(set(videos) - set(corrupt))
-    vid_len = 25
+    vid_len = 60
     
     f = h5py.File(args.save_path, "w")
     dset1 = f.create_dataset("video", (len(videos), vid_len, 16, 16), dtype='f')
@@ -105,7 +105,7 @@ def main(args):
                 p_encode = video_encode(im)
                 encoded_images += [p_encode[1].squeeze(0)]
         if vid_len > len(encoded_images):
-            encoded_images += [p_encode[1].squeeze(0)] * (vid_len - len(encoded_images))
+            encoded_images += [np.zeros_like(p_encode[1].squeeze(0))] * (vid_len - len(encoded_images))
 
         encoded_images = np.stack(encoded_images)
 
