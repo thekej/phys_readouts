@@ -39,7 +39,7 @@ def get_lr(optimizer):
 
 
 data_root = get_query_dir("dpi_data_dir")
-out_root = get_query_dir("out_dir")
+out_root = '/ccn2/u/thekej/sgnn_out_dir/3_layer_512_1e_5/'#get_query_dir("out_dir")
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--pstep', type=int, default=2)
@@ -53,9 +53,9 @@ parser.add_argument('--training_fpt', type=float, default=1)
 # parser.add_argument('--nf_relation', type=int, default=300)
 # parser.add_argument('--nf_particle', type=int, default=200)
 # parser.add_argument('--nf_effect', type=int, default=200)
-parser.add_argument('--n_layer', type=int, default=1)
+parser.add_argument('--n_layer', type=int, default=3)
 parser.add_argument('--p_step', type=int, default=4)
-parser.add_argument('--hidden_dim', type=int, default=200)
+parser.add_argument('--hidden_dim', type=int, default=512)
 
 parser.add_argument('--model_name', default='DPINet2')
 parser.add_argument('--floor_cheat', type=int, default=0)
@@ -84,7 +84,7 @@ parser.add_argument('--n_his', type=int, default=0)
 
 parser.add_argument('--n_epoch', type=int, default=1000)
 parser.add_argument('--beta1', type=float, default=0.9)
-parser.add_argument('--lr', type=float, default=0.0001)
+parser.add_argument('--lr', type=float, default=1e-5)
 parser.add_argument('--batch_size', type=int, default=1)
 parser.add_argument('--forward_times', type=int, default=2)
 
@@ -224,31 +224,20 @@ with open(os.path.join(args.outf, "args_stat.pkl"), 'wb') as f:
     pickle.dump(args, f)
 
 optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(args.beta1, 0.999))
-scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.8, patience=3, verbose=True)
+scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.8, patience=25, verbose=True)
 
 if args.resume_epoch > 0 or args.resume_iter > 0:
-    # load local parameters
-    args_load = model.load_local(os.path.join(args.outf, "args_stat.pkl"))
-    args_current = vars(args)
-
-    exempt_list = ["dataf", "lr", "num_workers", "resume_epoch", "resume_iter"]
-
-    for key in args_load:
-        if key in exempt_list:
-            continue
-
-        assert(args_load[key] == args_current[key]), f"{key} is mismatched in loaded args and current args: {args_load[key]} vs {args_current[key]}"
-
-    # check args_load
     model_path = os.path.join(args.outf, 'net_epoch_%d_iter_%d.pth' % (args.resume_epoch, args.resume_iter))
+    #mod = args.model_path
     print("Loading saved ckp from %s" % model_path)
     logger.info("Loading saved ckp from %s" % model_path)
 
     checkpoint = torch.load(model_path)
     if "model_state_dict" in checkpoint:
+    #    print(checkpoint.keys())
         model.load_state_dict(checkpoint['model_state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+    #    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    #    scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
     else:
         model.load_state_dict(torch.load(model_path))
 
@@ -340,7 +329,8 @@ for epoch in range(st_epoch, args.n_epoch):
                 writer.add_histogram(f'{phase}/predicted_x', predicted[:,0], train_iter)
                 writer.add_histogram(f'{phase}/predicted_y', predicted[:,1], train_iter)
                 writer.add_histogram(f'{phase}/predicted_z', predicted[:,2], train_iter)
-                writer.add_scalar(f'{phase}/loss', current_loss, train_iter)
+                writer.add_scalar(f'{phase}/step_loss', current_loss, train_iter)
+                writer.add_scalar(f'{phase}/average_loss', current_loss, train_iter)
             previous_run_time = time.time()
 
             if phase == 'train' and i > 0 and i % args.ckp_per_iter == 0:
@@ -365,9 +355,9 @@ for epoch in range(st_epoch, args.n_epoch):
             logger.info("Best valid epoch {:4d}".format(best_valid_epoch))
             logger.info("current lr {:.6f}".format(float(get_lr(optimizer))))
             # check early stopping
-            if epoch - best_valid_epoch >= 10:
-                print('Early stopping with 10 epochs!')
-                logger.info('Early stopping with 10 epochs!')
+            if epoch - best_valid_epoch >= 100:
+                print('Early stopping with 100 epochs!')
+                logger.info('Early stopping with 100 epochs!')
                 print('Best valid loss {:.6f}, Best valid epoch {:4d}'.format(best_valid_loss, best_valid_epoch))
                 logger.info('Best valid loss {:.6f}, Best valid epoch {:4d}'.format(best_valid_loss, best_valid_epoch))
                 exit(0)

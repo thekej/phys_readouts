@@ -103,7 +103,6 @@ class SGNN(nn.Module):
         f_p_ = torch.cat((f_o_[obj_id], f_p), dim=-1)
         s_p_ = torch.cat((s_o_[obj_id], s_p), dim=-1)
         s_p_ = self.embedding2(s_p_)  # [N, H]
-
         if self.gravity_axis is not None:
             g_p = torch.zeros_like(f_p_)[..., 0]  # [N, 3]
             g_p[..., self.gravity_axis] = 1
@@ -113,6 +112,129 @@ class SGNN(nn.Module):
         f_p_, s_p_ = self.object_to_particle(f_p_, s_p_, edge_index_inner, edge_attr_inner_f)  # [N, 3, x], [N, H]
         v_out = self.predictor(x_p, f_p_, s_p_, obj_id, obj_type, num_obj)  # [N, 3]
         return v_out
+    
+    def extract(self, x_p, v_p, h_p, obj_id, obj_type):
+        try:
+            h_p[x_p[..., 1] < 0.1, -1] = 1
+        except:
+            pass
+        s_p = self.embedding(h_p)  # [N, H]
 
+        f_o = scatter(torch.stack((x_p, v_p), dim=-1), obj_id, dim=0, reduce='mean')  # [N_obj, 3, x]
+        s_o = scatter(s_p, obj_id, dim=0) * self.eta  # [N_obj, H]
+
+        edge_index = self.build_graph(x_p)
+        edge_index_inner_mask = obj_id[edge_index[0]] == obj_id[edge_index[1]]
+        edge_index_inter_mask = obj_id[edge_index[0]] != obj_id[edge_index[1]]
+        edge_index_inner = edge_index[..., edge_index_inner_mask]  # [2, M_in]
+        edge_index_inter = edge_index[..., edge_index_inter_mask]  # [2, M_out]
+
+        f_p = torch.stack((x_p, v_p), dim=-1)  # [N, 3, 2]
+        f_p = torch.cat((f_p - f_o[obj_id], v_p.unsqueeze(-1)), dim=-1)  # [N, 3, 3]
+        s_p = torch.cat((s_o[obj_id], s_p), dim=-1)  # [N, 2H]
+        s_p = self.embedding1(s_p)  # [N, H]
+        edge_attr_inter_f = (x_p[edge_index_inter[0]] - x_p[edge_index_inter[1]]).unsqueeze(-1)  # [M_out, 3, 1]
+        edge_attr_f, edge_attr_s = self.local_interaction(f_p, s_p, edge_index_inter, edge_attr_inter_f)
+        # [M_out, H], [M_out, 3, x]
+
+        if self.gravity_axis is not None:
+            g_o = torch.zeros_like(f_o)[..., 0]  # [N_obj, 3]
+            g_o[..., self.gravity_axis] = 1
+            g_o = g_o * self.obj_g_p(s_o)
+            f_o = torch.cat((f_o, g_o.unsqueeze(-1)), dim=-1)  # [N_obj, 3, x+1]
+
+        num_obj = obj_id.max() + 1  # N_obj
+        edge_index_o = get_fully_connected(num_obj, device=obj_id.device, loop=True)  # [2, M_obj]
+        edge_mapping = obj_id[edge_index_inter[0]] * num_obj + obj_id[edge_index_inter[1]]  # [M_out]
+        edge_attr_o_f = scatter(edge_attr_f, edge_mapping, dim=0, reduce='mean', dim_size=num_obj ** 2)  # [M_obj, 3, x]
+        edge_attr_o_s = scatter(edge_attr_s, edge_mapping, dim=0, reduce='mean', dim_size=num_obj ** 2)  # [M_obj, H]
+        edge_pseudo = torch.ones(edge_attr_s.shape[0]).to(edge_attr_s.device)  # [M_, 1]
+        count = scatter(edge_pseudo, edge_mapping, dim=0, reduce='sum', dim_size=num_obj ** 2)
+        mask = count > 0
+        edge_index_o, edge_attr_o_f, edge_attr_o_s = edge_index_o[..., mask], edge_attr_o_f[mask], edge_attr_o_s[mask]
+        f_o_, s_o_ = self.object_message_passing(f_o[..., 1:], s_o, edge_index_o, edge_attr_o_f, edge_attr_o_s)  # [N_obj, 3, 2]
+
+        edge_attr_inner_f = (x_p[edge_index_inner[0]] - x_p[edge_index_inner[1]]).unsqueeze(-1)  # [M_in, 3, 1]
+        f_p_ = torch.cat((f_o_[obj_id], f_p), dim=-1)
+        s_p_ = torch.cat((s_o_[obj_id], s_p), dim=-1)
+        s_p_ = self.embedding2(s_p_)  # [N, H]
+        if self.gravity_axis is not None:
+            g_p = torch.zeros_like(f_p_)[..., 0]  # [N, 3]
+            g_p[..., self.gravity_axis] = 1
+            g_p = g_p * self.particle_g_p(s_p_)
+            f_p_ = torch.cat((f_p_, g_p.unsqueeze(-1)), dim=-1)  # [N_obj, 3, x+1]
+
+        f_p_, s_p_ = self.object_to_particle(f_p_, s_p_, edge_index_inner, edge_attr_inner_f)  # [N, 3, x], [N, H]
+
+        pooled_reshaped = nn.AdaptiveAvgPool1d(195)(s_p_.transpose(0, 1).unsqueeze(0)).squeeze(0).transpose(0, 1)
+
+        return pooled_reshaped
+
+    def extract_objects(self, x_p, v_p, h_p, obj_id, obj_type, obj_yellow, obj_red):
+        try:
+            h_p[x_p[..., 1] < 0.1, -1] = 1
+        except:
+            pass
+        s_p = self.embedding(h_p)  # [N, H]
+
+        f_o = scatter(torch.stack((x_p, v_p), dim=-1), obj_id, dim=0, reduce='mean')  # [N_obj, 3, x]
+        s_o = scatter(s_p, obj_id, dim=0) * self.eta  # [N_obj, H]
+
+        edge_index = self.build_graph(x_p)
+        edge_index_inner_mask = obj_id[edge_index[0]] == obj_id[edge_index[1]]
+        edge_index_inter_mask = obj_id[edge_index[0]] != obj_id[edge_index[1]]
+        edge_index_inner = edge_index[..., edge_index_inner_mask]  # [2, M_in]
+        edge_index_inter = edge_index[..., edge_index_inter_mask]  # [2, M_out]
+
+        f_p = torch.stack((x_p, v_p), dim=-1)  # [N, 3, 2]
+        f_p = torch.cat((f_p - f_o[obj_id], v_p.unsqueeze(-1)), dim=-1)  # [N, 3, 3]
+        s_p = torch.cat((s_o[obj_id], s_p), dim=-1)  # [N, 2H]
+        s_p = self.embedding1(s_p)  # [N, H]
+        edge_attr_inter_f = (x_p[edge_index_inter[0]] - x_p[edge_index_inter[1]]).unsqueeze(-1)  # [M_out, 3, 1]
+        edge_attr_f, edge_attr_s = self.local_interaction(f_p, s_p, edge_index_inter, edge_attr_inter_f)
+        # [M_out, H], [M_out, 3, x]
+
+        if self.gravity_axis is not None:
+            g_o = torch.zeros_like(f_o)[..., 0]  # [N_obj, 3]
+            g_o[..., self.gravity_axis] = 1
+            g_o = g_o * self.obj_g_p(s_o)
+            f_o = torch.cat((f_o, g_o.unsqueeze(-1)), dim=-1)  # [N_obj, 3, x+1]
+
+        num_obj = obj_id.max() + 1  # N_obj
+        edge_index_o = get_fully_connected(num_obj, device=obj_id.device, loop=True)  # [2, M_obj]
+        edge_mapping = obj_id[edge_index_inter[0]] * num_obj + obj_id[edge_index_inter[1]]  # [M_out]
+        edge_attr_o_f = scatter(edge_attr_f, edge_mapping, dim=0, reduce='mean', dim_size=num_obj ** 2)  # [M_obj, 3, x]
+        edge_attr_o_s = scatter(edge_attr_s, edge_mapping, dim=0, reduce='mean', dim_size=num_obj ** 2)  # [M_obj, H]
+        edge_pseudo = torch.ones(edge_attr_s.shape[0]).to(edge_attr_s.device)  # [M_, 1]
+        count = scatter(edge_pseudo, edge_mapping, dim=0, reduce='sum', dim_size=num_obj ** 2)
+        mask = count > 0
+        edge_index_o, edge_attr_o_f, edge_attr_o_s = edge_index_o[..., mask], edge_attr_o_f[mask], edge_attr_o_s[mask]
+        f_o_, s_o_ = self.object_message_passing(f_o[..., 1:], s_o, edge_index_o, edge_attr_o_f, edge_attr_o_s)  # [N_obj, 3, 2]
+
+        # reorder given yellow and red first
+        # pad to max number of objects
+        # Get the elements at index1 and index2
+        element1 = s_o_[obj_yellow].unsqueeze(0)
+        element2 = s_o_[obj_red].unsqueeze(0)
+
+        # Get all the other elements except the ones at index1 and index2
+        other_elements_mask = torch.ones(s_o_.size(0), dtype=torch.bool)
+        other_elements_mask[obj_yellow] = 0
+        other_elements_mask[obj_red] = 0
+        other_elements = s_o_[other_elements_mask]
+
+        # Concatenate the tensors
+        result = torch.cat([element1, element2, other_elements], dim=0)
+        
+        # Determine how much zero padding is needed
+        padding_rows = 12 - result.size(0)
+
+        # Create the zero tensor for padding
+        zero_tensor = torch.zeros((padding_rows, result.size(1)))
+
+        # Concatenate the reordered tensor with the zero tensor
+        result = torch.cat([result, zero_tensor.cuda()], dim=0)
+
+        return result
 
 

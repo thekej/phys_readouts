@@ -74,31 +74,31 @@ def main(args):
 
         #if args.embeddings == 'h':
         h = readout_h_run(model, state, v_in, act_in, seed=args.seed)
-        h = h.squeeze(1)
-        ocp += [h[:, :13]]
-        
-        for c in c_in:
+        h = jax.device_get(h.squeeze(1))
+        ocp += [h[:, :12].reshape(8, -1)]
+
+        for i_c, c in enumerate(c_in):
+
             if c + 7 > 201:
-                ocd_focused += [h[:,-12:]]
+                ocd_focused += [h[i_c,-12:].reshape(1, -1)]
             elif c - 6 < 0:
-                ocd_focused += [h[:,:12]]
+                ocd_focused += [h[i_c,:12].reshape(1, -1)]
             else:
-                ocd_focused += [h[:,c-6:c+6]]
+                ocd_focused += [h[i_c,c-6:c+6].reshape(1, -1)]
             
             
             if c - 25 < 0:
-                feats = h[:, :50]
+                feats = h[i_c, :50]
             elif c + 25 > 201:
-                feats = h[:, -50:]
+                feats = h[i_c, -50:]
             else:
-                feats = h[:, c-25:c+25]
+                feats = h[i_c, c-25:c+25]
                 
-            if feats.shape[1] < 50:
-                pad_width = ((0, 0), (0, 50 - feats.shape[1]), (0, 0), (0, 0), (0, 0))
+            if feats.shape[0] < 50:
+                pad_width = ((0, 50 - feats.shape[1]), (0, 0), (0, 0), (0, 0))
                 # Pad the array
                 feats = np.pad(feats, pad_width, mode='constant', constant_values=0)
-
-            ocd += [feats]
+            ocd += [np.expand_dims(feats, axis=0).reshape(1, -1)]
 
     dt = h5py.special_dtype(vlen=str)
 
@@ -107,21 +107,21 @@ def main(args):
         hf.create_dataset("features", data=np.concatenate(ocp))
         hf.create_dataset("label", data=np.concatenate(labels))
         hf.create_dataset("contacts", data=np.concatenate(contacts))  
-        hf.create_dataset("stimulus", data=stimulus, dtype=dt)
+        hf.create_dataset("filenames", data=stimulus, dtype=dt)
      
     print('save 2')
     with h5py.File(args.save_path_ocd ,'w') as hf:
         hf.create_dataset("features", data=np.concatenate(ocd))
         hf.create_dataset("label", data=np.concatenate(labels))
         hf.create_dataset("contacts", data=np.concatenate(contacts))  
-        hf.create_dataset("stimulus", data=stimulus, dtype=dt)
+        hf.create_dataset("filenames", data=stimulus, dtype=dt)
         
     print('save 3')
     with h5py.File(args.save_path_focused ,'w') as hf:
         hf.create_dataset("features", data=np.concatenate(ocd_focused))
         hf.create_dataset("label", data=np.concatenate(labels))
         hf.create_dataset("contacts", data=np.concatenate(contacts))  
-        hf.create_dataset("stimulus", data=stimulus, dtype=dt)
+        hf.create_dataset("filenames", data=stimulus, dtype=dt)
         '''   
         else:
             x, z, h = readout_z_run(model, state, v_in, act_in, seed=args.seed,

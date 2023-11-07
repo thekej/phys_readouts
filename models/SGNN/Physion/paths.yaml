@@ -28,4 +28,4 @@
 training_data_dir: '/ccn2/u/rmvenkat/data/testing_physion/gen_full_data_depth_512/lf_0'
 testing_data_dir: '/ccn2/u/rmvenkat/data/testing_physion/gen_full_data_depth_512/lf_0'
 dpi_data_dir: '/ccn2/u/thekej/sgnn/'
-out_dir: '/ccn2/u/thekej/sgnn_out_dir/'
+out_dir: '/ccn2/u/thekej/sgnn_out_dir/original/'
