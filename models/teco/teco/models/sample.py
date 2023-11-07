@@ -158,8 +158,7 @@ def readout_h_run(sample_model, state, video, actions, seed=0, state_spec=None, 
         p_imagine = jax.pmap(_readout_h, in_axes=(0, 0, 0, 0, 0))
         
     cond, zs = p_observe(state, encodings)
-    act = actions[:, :, :seq_len]
-    print(actions.shape, act.shape)
+    act = actions#[:, :, :seq_len]
     readout_embed = p_imagine(state, zs, act, cond, rngs)
 
     return readout_embed 
@@ -212,7 +211,6 @@ def readout_z_run(sample_model, state, video, actions, seed=0, state_spec=None,
     itr = list(range(open_loop_ctx, seq_len))
     for i in tqdm(itr):
         act = actions[:, :, :seq_len]
-        print(act.shape)
         r, z, h, rngs = p_imagine(state, zs, act, cond, i, rngs)
         z_hats.append(jax.numpy.asarray(z))
         hs.append(jax.numpy.asarray(h))

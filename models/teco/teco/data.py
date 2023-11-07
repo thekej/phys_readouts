@@ -27,30 +27,43 @@ def load_hdf5(config, split='train'):
                 video = hf['video'][:split_size]
                 actions = np.zeros((video.shape[0],), dtype=np.int32)#hf['actions'][:]
                 label = hf['label'][:split_size]
+                collision_ind = hf['collision_ind'][:]
+                contacts = hf['contacts'][:]
+                stimuli = hf['stimulus'][:]
                 print('Train Dataset size:', split_size)
             elif split == 'test':
                 split_size = int(0.9* hf['label'].shape[0])
                 video = hf['video'][split_size:]
                 actions = np.zeros((video.shape[0],), dtype=np.int32)#hf['actions'][:]
                 label = hf['label'][split_size:]
+                collision_ind = hf['collision_ind'][:]
+                contacts = hf['contacts'][:]
+                stimuli = hf['stimulus'][:]
                 print('Test Dataset size:', video.shape[0])
             else:
-                
                 video = hf['video'][:]
                 actions = np.zeros((video.shape[0],), dtype=np.int32)#hf['actions'][:]
                 label = hf['label'][:]
+                collision_ind = hf['collision_ind'][:]
+                contacts = hf['contacts'][:]
+                stimuli = hf['stimulus'][:]
                 print('Test Dataset size:', video.shape[0])
-        return video, actions, label
+        return video, actions, label, collision_ind, contacts, stimuli
 
-    video, actions, label = read(config.data_path)
+    video, actions, label, collision_ind, contacts, stimulus = read(config.data_path)
 
     # If you want to convert these numpy arrays to tf.Tensor
     video = tf.convert_to_tensor(video, dtype=tf.int32)
     actions = tf.convert_to_tensor(actions, dtype=tf.int32)
     label = tf.convert_to_tensor(label, dtype=tf.int32)
+    collision_ind = tf.convert_to_tensor(collision_ind, dtype=tf.int32)
+    contacts = tf.convert_to_tensor(contacts, dtype=tf.int32)
+    stimulus = tf.convert_to_tensor(stimulus, dtype=tf.string)
 
     # Create a dataset from tensor slices
-    data_dict = {'video': video, 'actions': actions, 'label': label}
+    data_dict = {'video': video, 'actions': actions, 'label': label, 
+                 'contacts': contacts, 'collision_ind': collision_ind,
+                 'stimulus': stimulus}
     dataset = tf.data.Dataset.from_tensor_slices(data_dict)
     #dataset = tf.data.Dataset.from_tensor_slices((video, actions, label))
 
