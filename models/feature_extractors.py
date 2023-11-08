@@ -218,7 +218,7 @@ class ResNet50(PhysionFeatureExtractor):
         return DataAugmentationForVideoMAE(
             imagenet_normalize=True,
             rescale_size=224,
-        ), 150, 4
+        ), 100, 24
 
     def fwd(self, images):
         '''
@@ -238,14 +238,10 @@ class ResNet50(PhysionFeatureExtractor):
         videos: [B, C, T, H, W], T is usually 4 and videos are normalized with imagenet norm
         returns: [B, T, C, H, W] extracted features
         '''
-
-        videos = videos[:, :4]
         bs, num_frames, num_channels, h, w = videos.shape
         videos = videos.flatten(0, 1)
         features = self.fwd(videos)
-
         features = features.reshape(bs, num_frames, features.shape[1], features.shape[2], features.shape[3])
-
         return features
 
     def extract_features_ocd(self, videos):
@@ -256,9 +252,7 @@ class ResNet50(PhysionFeatureExtractor):
 
         videos = videos.flatten(0, 1)
         features = self.fwd(videos)
-
         features = features.unsqueeze(0)
-
         return features
 
     def extract_features_for_seg(self, img):
