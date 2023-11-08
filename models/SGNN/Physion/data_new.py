@@ -768,7 +768,7 @@ class PhysicsFleXDataset(Dataset):
             raise ValueError
         self.training_fpt = self.args.training_fpt
         self.dt = self.training_fpt * self.args.dt
-        self.start_timestep = 0 #int(15 * self.training_fpt)
+        self.start_timestep = 45#int(15 * self.training_fpt)
         
         self.all_trials = glob.glob(os.path.join(args.data_root, "**/**/**"))
 
@@ -888,7 +888,10 @@ class PhysicsFleXDataset(Dataset):
             is_subsample = subsample_particles_on_large_objects(phases_dict, limit=3000)
             # because we want to sample also idx_timestep + 1
             time_step = phases_dict["time_step"] - self.training_fpt
-            idx_timestep = np.random.randint(self.start_timestep, time_step)
+            if time_step <= self.start_timestep:
+                idx_timestep = int(time_step - self.training_fpt)
+            else:
+                idx_timestep = np.random.randint(self.start_timestep, time_step)
         else:
             raise ValueError
 #/ccn2/u/thekej/sgnn/roll_all_movies/pilot_it2_rollingSliding_simple_collision_box/0000/

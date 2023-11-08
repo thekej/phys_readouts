@@ -43,9 +43,9 @@ parser.add_argument('--training_fpt', type=float, default=1)
 # parser.add_argument('--nf_relation', type=int, default=300)
 # parser.add_argument('--nf_particle', type=int, default=200)
 # parser.add_argument('--nf_effect', type=int, default=200)
-parser.add_argument('--n_layer', type=int, default=1)
+parser.add_argument('--n_layer', type=int, default=3)
 parser.add_argument('--p_step', type=int, default=4)
-parser.add_argument('--hidden_dim', type=int, default=200)
+parser.add_argument('--hidden_dim', type=int, default=512)
 
 parser.add_argument('--modelf', default='files')
 parser.add_argument('--dataf', default='data')
@@ -120,9 +120,9 @@ if args.env == "TDWdominoes":
     model_name = copy.deepcopy(args.modelf)
     source, target = args.modelf.split('_')[0], copy.deepcopy(args.dataf)
     print('Source Target', source, target)
-    args.modelf = 'dump/' + args.modelf
+    #args.modelf = 'dump/' + args.modelf
 
-    args.modelf = os.path.join(model_root, args.modelf)
+    #args.modelf = os.path.join(model_root, args.modelf)
 else:
     raise AssertionError("Unsupported env")
 

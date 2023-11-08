@@ -7,9 +7,11 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 import copy
+import glob
 import gzip
 import pickle
 import h5py
+import csv
 
 import multiprocessing as mp
 
@@ -39,7 +41,7 @@ parser.add_argument('--pstep', type=int, default=2)
 parser.add_argument('--epoch', type=int, default=0)
 parser.add_argument('--iter', type=int, default=0)
 parser.add_argument('--env', default='')
-parser.add_argument('--time_step', type=int, default=0)
+parser.add_argument('--time_step', type=int, default=250)
 parser.add_argument('--time_step_clip', type=int, default=0)
 parser.add_argument('--dt', type=float, default=1./60.)
 parser.add_argument('--training_fpt', type=float, default=1)
@@ -48,9 +50,9 @@ parser.add_argument('--subsample', type=int, default=3000)
 # parser.add_argument('--nf_relation', type=int, default=300)
 # parser.add_argument('--nf_particle', type=int, default=200)
 # parser.add_argument('--nf_effect', type=int, default=200)
-parser.add_argument('--n_layer', type=int, default=1)
+parser.add_argument('--n_layer', type=int, default=3)
 parser.add_argument('--p_step', type=int, default=4)
-parser.add_argument('--hidden_dim', type=int, default=200)
+parser.add_argument('--hidden_dim', type=int, default=512)
 
 parser.add_argument('--rand_rot', type=int, default=0)
 parser.add_argument('--pred_only', type=int, default=1)
@@ -126,8 +128,8 @@ if args.env == "TDWdominoes":
 
     phases_dict = dict()  # load from data
     model_name = copy.deepcopy(args.modelf)
-    args.modelf = 'dump/' + args.modelf
-    args.modelf = os.path.join(model_root, args.modelf)
+    #args.modelf = 'dump/' + args.modelf
+    #args.modelf = os.path.join(model_root, args.modelf)
 else:
     raise AssertionError("Unsupported env")
 
@@ -204,20 +206,37 @@ if args.save_pred:
     if args.ransac_on_pred:
         pred_gif_folder = os.path.join(evalf_root, "ransacOnPred-" + mode +  scenario)
     mkdir(pred_gif_folder)
-accs = []
+
+accs = {'0.1': [], '0.12': [], '0.13': [], '0.14': [],
+        '0.15': [], '0.06': [], '0.07': [], '0.08': [],
+        '0.09': [], '0.11': []}
 recs = []
 
 dt = args.training_fpt * args.dt
 
-gt_preds = []
-arg_names = [file for file in os.listdir(args.dataf) if not file.endswith("txt")]
+#gt_preds = []
+#arg_names = [file for file in os.listdir(args.dataf) if not file.endswith("txt")]
 trial_full_paths = []
-for arg_name in arg_names:
-    trial_full_paths.append(os.path.join(args.dataf, arg_name))
+#for arg_name in arg_names:
+#    trial_full_paths.append(os.path.join(args.dataf, arg_name))
+data_root = '/ccn2/u/thekej/sgnn_readout/test/data_balanced/'
+trial_full_paths = glob.glob(os.path.join(data_root, "*/*"))
+#trial_full_paths = list(os.walk(data_root))
+trial_full_paths = trial_full_paths#[3000:3010]
+#trial_full_paths = random.sample(trial_full_paths, 50)
 
+title = ['Model', 'Readout Train Data', 'Readout Test Data', 'Train Accuracy', 
+              'Test Accuracy', 'Readout Type', 'Predicted Prob_false', 
+              'Predicted Prob_true', 'Predicted Outcome', 'Actual Outcome', 
+              'Stimulus Name']
+
+results = {'0.1': [title], '0.12': [title], '0.13': [title], '0.14': [title], 
+           '0.15': [title], '0.06': [title], '0.07': [title], '0.08': [title], 
+           '0.09': [title], '0.11': [title]}
 
 for trial_id, trial_name in enumerate(trial_full_paths):
     print('processing case', trial_id, 'total', len(trial_full_paths))
+    #scenarios = 'drop'
 
     gt_node_rs_idxs = []
 
@@ -237,8 +256,10 @@ for trial_id, trial_name in enumerate(trial_full_paths):
     print("Rollout %d / %d" % (trial_id, len(trial_full_paths)))
 
     timesteps = [t for t in range(0, args.time_step - int(args.training_fpt), int(args.training_fpt))]
+    if len(timesteps) > 150:
+        timesteps = [t for t in range(0, 150, int(args.training_fpt))]
     max_timestep = len(timesteps)
-    total_nframes = max_timestep  # len(timesteps)
+    total_nframes = 150#max_timestep  # len(timesteps)
 
     if args.env == "TDWdominoes":
         pkl_path = os.path.join(trial_name, 'phases_dict.pkl')
@@ -246,7 +267,6 @@ for trial_id, trial_name in enumerate(trial_full_paths):
             phases_dict = pickle.load(f)
 
     phases_dict["trial_dir"] = trial_name
-    print(phases_dict["n_particles"])
 
     if args.test_training_data_processing:
         is_bad_chair = correct_bad_chair(phases_dict)
@@ -263,7 +283,6 @@ for trial_id, trial_name in enumerate(trial_full_paths):
         is_remove_obstacles = remove_large_obstacles(phases_dict, limit=args.subsample)
         # downsample large object
         # is_subsample = subsample_particles_on_large_objects(phases_dict, 4000)
-    print(phases_dict["n_particles"])
 
     if args.rand_rot:
         print('Using Random Rotation!')
@@ -288,7 +307,7 @@ for trial_id, trial_name in enumerate(trial_full_paths):
              cos + (1 - cos) * z * z]
         ]
         Q = np.array(ret)
-
+    parts = []
     for current_fid, step in enumerate(timesteps):
         data_path = os.path.join(trial_name, str(step) + '.h5')
         data_nxt_path = os.path.join(trial_name, str(step + int(args.training_fpt)) + '.h5')
@@ -317,6 +336,7 @@ for trial_id, trial_name in enumerate(trial_full_paths):
             count_nodes = positions.shape[0]
             n_particles = count_nodes - n_shapes
             print("n_particles", n_particles)
+            parts.append(n_particles)
             print("n_shapes", n_shapes)
             p_gt = np.zeros((total_nframes, n_particles + n_shapes, args.position_dim))
             s_gt = np.zeros((total_nframes, n_shapes, args.shape_state_dim))
@@ -330,12 +350,16 @@ for trial_id, trial_name in enumerate(trial_full_paths):
     for step in range(n_actual_frames, total_nframes):
         p_gt[step] = p_gt[n_actual_frames - 1]
         # gt_node_rs_idxs.append(gt_node_rs_idxs[-1])
+        
+    data_mean = {}
 
     if not gt_only:
 
         # model rollout
         start_timestep = 45  # 15
-        start_id = 15  # 5
+        start_id = 45  # 5
+        if n_actual_frames < start_id:
+            start_timestep = n_actual_frames - 1
         data_path = os.path.join(trial_name, f'{start_timestep}.h5')
 
         data = load_data_dominoes(data_names, data_path, phases_dict)
@@ -352,7 +376,7 @@ for trial_id, trial_name in enumerate(trial_full_paths):
             p_pred[t] = p_gt[t]
             # node_rs_idxs.append(gt_node_rs_idxs[t])
 
-        for current_fid in range(total_nframes - start_id):
+        for current_fid in range(150 - start_id):
             if current_fid % 10 == 0:
                 print("Step %d / %d" % (current_fid + start_id, total_nframes))
             p_pred[start_id + current_fid] = data[0]
@@ -393,6 +417,7 @@ for trial_id, trial_name in enumerate(trial_full_paths):
                         else:
                             buf[d] = Variable(buf[d])
                 x, v, h, obj_id = buf
+                print(x.shape, v.shape, h.shape)
                 vels = model(x, v, h, obj_id, obj_type)
                 if args.debug:
                     data_nxt_path = os.path.join(trial_name, str(step + args.training_fpt) + '.h5')
@@ -403,7 +428,6 @@ for trial_id, trial_name in enumerate(trial_full_paths):
                     print(loss)
 
             vels = denormalize([vels.data.cpu().numpy()], [stat[1]])[0]
-
             if args.ransac_on_pred:
                 positions_prev = data[0]
                 predicted_positions = data[0] + vels * dt
@@ -429,28 +453,70 @@ for trial_id, trial_name in enumerate(trial_full_paths):
                 data[1][:, :args.position_dim] = v_nxt_gt[current_fid]
 
         import scipy
-        spacing = 0.05
-        st0, st1, st2 = instance_idx[0], instance_idx[1], instance_idx[2]
-        obj_0_pos = p_pred[-1][st0:st1, :]
-        obj_1_pos = p_pred[-1][st1:st2, :]
+        #spacing = 0.05
+        for spacing in [0.06]:#, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12, 0.13, 0.14, 0.15]:
+            st0, st1, st2 = instance_idx[0], instance_idx[1], instance_idx[2]
+            obj_0_pos = p_pred[-1][st0:st1, :]
+            obj_1_pos = p_pred[-1][st1:st2, :]
 
-        sim_mat = scipy.spatial.distance_matrix(obj_0_pos, obj_1_pos, p=2)
-        min_dist1=np.min(sim_mat)
-        pred_target_contacting_zone = min_dist1 < spacing
+            sim_mat = scipy.spatial.distance_matrix(obj_0_pos, obj_1_pos, p=2)
+            min_dist1=np.min(sim_mat)
+            pred_target_contacting_zone = min_dist1 < spacing
 
-        obj_0_pos = p_gt[-1][st0:st1, :]
-        obj_1_pos = p_gt[-1][st1:st2, :]
+            obj_0_pos = p_gt[-1][st0:st1, :]
+            obj_1_pos = p_gt[-1][st1:st2, :]
 
-        sim_mat = scipy.spatial.distance_matrix(obj_0_pos, obj_1_pos, p=2)
-        min_dist2= np.min(sim_mat)
-        gt_target_contacting_zone = min_dist2 < spacing * 0.8
-        acc = int(gt_target_contacting_zone == pred_target_contacting_zone)
+            sim_mat = scipy.spatial.distance_matrix(obj_0_pos, obj_1_pos, p=2)
+            min_dist2= np.min(sim_mat)
+            gt_target_contacting_zone = min_dist2 < spacing * 0.8
+            acc = int(gt_target_contacting_zone == pred_target_contacting_zone)
 
-        accs.append(acc)
-        print(args.dataf)
-        print("gt vs pred:", gt_target_contacting_zone, pred_target_contacting_zone, min_dist2, min_dist1)
-        print("accuracy:", np.mean(accs))
+            accs[str(spacing)].append(acc)
+            print(args.dataf)
+            print("gt vs pred:", gt_target_contacting_zone, pred_target_contacting_zone, min_dist2, min_dist1)
+            print("Spacing: ", spacing, ", accuracy:", np.mean(accs[str(spacing)]))
 
+
+            scenarios = ''
+            print(trial_name)
+            if 'collide_all_movies' in trial_name:
+                scenarios = 'collide'
+            elif 'roll_all_movies' in trial_name:
+                scenarios = 'roll'
+            elif 'dominoes_all_movies' in trial_name:
+                scenarios = 'domino'
+            elif 'link_all_movies' in trial_name:
+                scenarios = 'link'
+            elif 'support_all_movies' in trial_name:
+                scenarios = 'towers'
+            elif 'contain_all_movies' in trial_name:
+                scenarios = 'contain'
+            elif 'drop_all_movies' in trial_name:
+                scenarios = 'drop'
+
+            pred_false = 1.0 if not pred_target_contacting_zone else 0.0
+            pred_true = 1.0 if pred_target_contacting_zone else 0.0
+
+            entry = ['sgnn_physion', 'all', scenarios, 0.5, 0.5,
+                     'observed_sgnn', pred_false, pred_true, int(pred_target_contacting_zone),
+                     int(gt_target_contacting_zone), trial_name.split('/')[-1]]
+
+            results[str(spacing)].append(entry)
+            filename = f'sgnn_physion_observed_{spacing}.csv'
+            with open(filename, 'w', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerows(results[str(spacing)])
+
+'''   
+    for i in range(len(results)):
+        results[i][4] = np.mean(accs)
+        results[i][3] = np.mean(accs)
+    filename = 'sgnn_physion_observed_0_05.csv'
+    with open(filename, 'w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerows(results)
+
+    
     # render in VisPy
     import vispy.scene
     from vispy import app
@@ -460,7 +526,7 @@ for trial_id, trial_name in enumerate(trial_full_paths):
     n_instance = 5  # args.n_instance
     y_rotate_deg = 0
     vis_length = total_nframes
-
+    
 
     def y_rotate(obj, deg=y_rotate_deg):
         tr = vispy.visuals.transforms.MatrixTransform()
@@ -486,6 +552,7 @@ for trial_id, trial_name in enumerate(trial_full_paths):
         vv1 = mesh_border_b1.get_vertices()
         cc1 = np.array([0., -floor_thickness*0.5, 0.], dtype=np.float32)
         mesh_border_b1.set_vertices(np.add(vv1, cc1))
+
 
     c = vispy.scene.SceneCanvas(keys='interactive', show=True, bgcolor='white')
     view = c.central_widget.add_view()
@@ -521,13 +588,15 @@ for trial_id, trial_name in enumerate(trial_full_paths):
     # view.add(line)
     # set animation
     t_step = 0
-
     '''
+
+'''
     set up data for rendering
     '''
     # 0 - p_pred: seq_length x n_p x 3
     # 1 - p_gt: seq_length x n_p x 3
     # 2 - s_gt: seq_length x n_s x 3
+'''
     print('p_pred', p_pred.shape)
     print('p_gt', p_gt.shape)
     print('s_gt', s_gt.shape)
@@ -657,6 +726,5 @@ for trial_id, trial_name in enumerate(trial_full_paths):
             os.path.join(pred_gif_folder, '%s_vid_%d_vispy.gif' % (prefix, idx_episode)),
             imgs, fps=20)
         print(os.path.join(pred_gif_folder, '%s_vid_%d_vispy.gif' % (prefix, idx_episode)))
-
-        [os.remove(gt_path) for gt_path in gt_paths + pred_paths]
-
+'''
+    
