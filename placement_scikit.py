@@ -8,9 +8,10 @@ import numpy as np
 from sklearn.datasets import make_classification
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
+from sklearn.linear_model import Ridge
+from sklearn.model_selection import GridSearchCV, KFold
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import GridSearchCV, StratifiedKFold
-from sklearn.svm import LinearSVC
+from sklearn.multioutput import MultiOutputRegressor
 
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 
