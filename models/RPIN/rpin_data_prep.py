@@ -30,15 +30,19 @@ def main(args):
     dset3 = f.create_dataset("labels", (len(dataset), 18, 10, 4), dtype='f')
     dset4 = f.create_dataset("data_last", (len(dataset), 7, 3, 256, 256), dtype='f')
     dset5 = f.create_dataset("binary_labels", (len(dataset)), dtype='i')
-    dset6 = f.create_dataset("ignore_mask", (len(dataset), 10), dtype='f')    
+    dset6 = f.create_dataset("ignore_mask", (len(dataset), 10), dtype='f')  
+    dset7 = f.create_dataset("contacts", (len(dataset), 2), dtype='f')
+    dt = h5py.special_dtype(vlen=str)
+    dset8 = f.create_dataset("filenames", (len(dataset)), dtype=dt)
 
-    stimulus_map = {}
+    stimulus_map, scenario_indices = {}, {}
     length = []
     idx = 0
     for i, batch in tqdm.tqdm(enumerate(data_loader)):
         data, rois, labels, data_last, ignore_mask, stimulus_name, \
-        binary_labels = batch['data'], batch['rois'], batch['labels'], batch['data_last'], batch['ignore_mask'], \
-                        batch['stimulus_name'][0], batch['binary_labels']
+        binary_labels, contacts, filenames = batch['data'], batch['rois'], batch['labels'], \
+                                            batch['data_last'], batch['ignore_mask'], \
+                        batch['stimulus_name'][0], batch['binary_labels'], batch['contacts']
         
         dset1[i] = data
         dset2[i] = rois
@@ -46,6 +50,8 @@ def main(args):
         dset4[i] = data_last
         dset5[i] = binary_labels
         dset6[i] = ignore_mask
+        dset7[i] = contacts
+        dset8[i] = filenames
         
         if not stimulus_name in stimulus_map.keys():
             stimulus_map[str(stimulus_name)] = idx
