@@ -423,10 +423,10 @@ with h5py.File(args.save_file_ocp,'w') as hf:
     hf.create_dataset("filenames", data=filenames, dtype=dt)
     
 import json
-with open('/ccn2/u/thekej/models/sgnn_physion/ocp/test_json.json', 'w') as f:
+with open('/ccn2/u/thekej/models/sgnn_physion/ocp/test_scenario_map.json', 'w') as f:
     json.dump(stimulus_map, f)
     
-with open('/ccn2/u/thekej/models/sgnn_physion/ocp/test_scenario_map.json', 'w') as f:
+with open('/ccn2/u/thekej/models/sgnn_physion/ocp/test_json.json', 'w') as f:
     json.dump(all_scenarios, f)
 
 print('save 2')
@@ -436,10 +436,10 @@ with h5py.File(args.save_file_ocd ,'w') as hf:
     hf.create_dataset("contacts", data=np.concatenate(contacts))
     hf.create_dataset("filenames", data=filenames, dtype=dt)
     
-with open('/ccn2/u/thekej/models/sgnn_physion/ocd/test_json.json', 'w') as f:
+with open('/ccn2/u/thekej/models/sgnn_physion/ocd/test_scenario_map.json', 'w') as f:
     json.dump(stimulus_map, f)
     
-with open('/ccn2/u/thekej/models/sgnn_physion/ocd/test_scenario_map.json', 'w') as f:
+with open('/ccn2/u/thekej/models/sgnn_physion/ocd/test_json.json', 'w') as f:
     json.dump(all_scenarios, f)
 
 print('save 3')
@@ -449,10 +449,10 @@ with h5py.File(args.save_file_focused ,'w') as hf:
     hf.create_dataset("contacts", data=np.concatenate(contacts))
     hf.create_dataset("filenames", data=filenames, dtype=dt)
 
-with open('/ccn2/u/thekej/models/sgnn_physion/ocd_focussed/test_json.json', 'w') as f:
+with open('/ccn2/u/thekej/models/sgnn_physion/ocd_focussed/test_scenario_map.json', 'w') as f:
     json.dump(stimulus_map, f)
     
-with open('/ccn2/u/thekej/models/sgnn_physion/ocd_focussed/test_scenario_map.json', 'w') as f:
+with open('/ccn2/u/thekej/models/sgnn_physion/ocd_focussed/test_json.json', 'w') as f:
     json.dump(all_scenarios, f)
     
 

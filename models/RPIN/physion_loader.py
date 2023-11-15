@@ -11,7 +11,65 @@ from  torch.utils.data import Dataset
 from torchvision import transforms
 
 pil_logger = logging.getLogger('PIL')
-pil_logger.setLevel(logging.ERROR)    
+pil_logger.setLevel(logging.ERROR)  
+
+def get_contact(f, frame):
+    cam_matrix = f['frames'][frame]['camera_matrices']['camera_matrix_cam0'][:]
+    cam_matrix = cam_matrix.reshape(4, 4)
+    proj_matrix = f['frames'][frame]['camera_matrices']['projection_matrix_cam0'][:]
+    proj_matrix = proj_matrix.reshape(4, 4)
+    contacts = proj_world_to_pixel(np.array(f['frames'][frame]['collisions']['contacts_ot'][()]), cam_matrix, proj_matrix)
+    pts = np.array([[contacts[0][0], contacts[0][1]]])
+    return pts
+
+def pad_ones(pts):
+    '''
+    pts: [N , K]
+    returns: [N, K+1]
+    '''
+    pw = np.concatenate([pts, np.ones([pts.shape[0], 1])], 1)
+    return pw
+
+def proj_world_to_pixel(pw, cam_matrix, proj_matrix):
+    '''
+    pw: [N, 3] world coords
+    cam_matrix: [4, 4] cam matrix
+    proj_matrix: [4, 4] proj matrix
+    returns: [N, 2] pixel coords
+    '''
+    matrix = np.matmul(proj_matrix, cam_matrix)
+    pw = pad_ones(pw).T
+    proj_pts = np.matmul(matrix, pw).T
+    proj_pts = proj_pts/proj_pts[:, 3:4]
+    proj_pts = proj_pts.clip(-1, 1)
+    proj_pts = (proj_pts + 1)/2
+    proj_pts = proj_pts[:, :2]
+    proj_pts[:, 1] = 1 - proj_pts[:, 1]
+    proj_pts = proj_pts[:, [1, 0]]
+    proj_pts = (proj_pts*128).astype(int)
+    return proj_pts
+
+def get_label(f):
+#     try:
+    with h5py.File(f) as h5file:
+        stimulus = h5file['static']['stimulus_name'][()]
+        counter = 0
+        for i, key in enumerate(h5file['frames'].keys()):
+            if not i % 4 == 0:
+                continue
+            counter += 1
+            lbl = np.array(h5file['frames'][key]['labels']['target_contacting_zone']).item()
+            if lbl:
+                contact = get_contact(h5file, key)
+                
+                if 'collide' in str(stimulus):
+                    return counter + 12, True, contact
+                else:
+                    return counter, True, contact
+
+        ind = len(h5file['frames'].keys()) // 8
+
+        return ind, False, np.array([[-1, -1]])
 
 def get_colors(f):
     id_img = np.array(f['frames']['0000']['images']['_id_cam0'][()]) # first frame, assumes all objects are in view
@@ -96,6 +154,7 @@ class RPINDataset(Dataset):
         if self.indices is not None:
             index = self.indices[index]
         with h5py.File(self.hdf5_files[index], 'r') as f: # load ith hdf5 file from list
+            collision_ind, label, contact = get_label(self.hdf5_files[index])
             colors = get_colors(f)
             frames = list(f['frames'])
             target_contacted_zone = False
@@ -158,6 +217,8 @@ class RPINDataset(Dataset):
             'stimulus_name': stimulus_name,
             'binary_labels': binary_labels[0],
             'images': images,
+            'contacts': contact,
+            'collision_ind': collision_ind,
         }
         return sample
     

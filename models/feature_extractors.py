@@ -102,13 +102,14 @@ class R3M_LSTM_OCD(R3M_LSTM):
 
 
 class DINOV2_LSTM(PhysionFeatureExtractor):
-    def __init__(self, weights_path,n_past=7, full_rollout=False):
+    def __init__(self, weights_path, n_past=7, full_rollout=False):
         super().__init__()
         from models.R3M.r3m_model import pfDINO_LSTM_physion, load_model
         self.model = pfDINO_LSTM_physion(n_past=n_past, full_rollout=full_rollout)
         self.model = load_model(self.model, weights_path)
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model = self.model.to(device)
+        self.n_past = n_past
         
     def transform(self):
         return DataAugmentationForVideoMAE(True, 224), 60, 25
