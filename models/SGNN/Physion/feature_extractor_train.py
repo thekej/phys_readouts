@@ -417,7 +417,7 @@ dt = h5py.special_dtype(vlen=str)
 
 print('save 1')
 with h5py.File(args.save_file_ocp,'w') as hf:
-    hf.create_dataset("features", data=np.concatenate(ocp))
+    hf.create_dataset("features", data=np.stack(ocp))
     hf.create_dataset("label", data=np.array(labels))
     hf.create_dataset("contacts", data=np.concatenate(contacts))
     hf.create_dataset("filenames", data=filenames, dtype=dt)
@@ -431,7 +431,7 @@ with open('/ccn2/u/thekej/models/sgnn_physion/ocp/train_scenario_map.json', 'w')
 
 print('save 2')
 with h5py.File(args.save_file_ocd ,'w') as hf:
-    hf.create_dataset("features", data=np.concatenate(ocd))
+    hf.create_dataset("features", data=np.stack(ocd))
     hf.create_dataset("label", data=np.array(labels))
     hf.create_dataset("contacts", data=np.concatenate(contacts))
     hf.create_dataset("filenames", data=filenames, dtype=dt)
@@ -444,7 +444,7 @@ with open('/ccn2/u/thekej/models/sgnn_physion/ocd/train_scenario_map.json', 'w')
 
 print('save 3')
 with h5py.File(args.save_file_focused ,'w') as hf:
-    hf.create_dataset("features", data=np.concatenate(ocd_focused))
+    hf.create_dataset("features", data=np.stack(ocd_focused))
     hf.create_dataset("label", data=np.array(labels))
     hf.create_dataset("contacts", data=np.concatenate(contacts))
     hf.create_dataset("filenames", data=filenames, dtype=dt)

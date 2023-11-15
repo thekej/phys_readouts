@@ -30,7 +30,43 @@ class PhysionFeatureExtractor(nn.Module):
         returns: [B, H, W, D] extracted features
         '''
 
-        
+
+class R3M(PhysionFeatureExtractor):
+    def __init__(self, weights_path):
+        from models.R3M.r3m_model import R3M_pretrained
+        super().__init__()
+        self.model = R3M_pretrained()
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.model = self.model.to(device)
+        self.model.eval()
+
+    def transform(self):
+        return DataAugmentationForVideoMAE(False, 224), 40, 12
+    
+    def get_encoder_feats(self, x):
+        # applies encoder to each image in x: (Bs, T, 3, H, W) or (Bs, 3, H, W)
+        with torch.no_grad():  # TODO: best place to put this
+            feats = []
+            for _x in torch.split(x, 1, dim=1):
+                _x = torch.squeeze(
+                    _x, dim=1
+                )  # _x is shape (Bs, 1, 3, H, W) => (Bs, 3, H, W) TODO: put this in _extract_feats?
+                feats.append(self._extract_feats(_x))
+        return torch.stack(feats, axis=1)
+
+    def _extract_feats(self, x):
+        feats = self.model(x)
+        feats = torch.flatten(feats, start_dim=1)  # (Bs, -1)
+        return feats
+
+    def extract_features(self, videos):
+        with torch.no_grad():
+            output = self.get_encoder_feats(videos)
+        return output
+
+    def extract_features_ocd(self, videos):
+        return self.extract_features(videos)
+    
 
 class R3M_LSTM(PhysionFeatureExtractor):
     def __init__(self, weights_path, n_past=7, full_rollout=False):
@@ -84,9 +120,18 @@ class DINOV2_LSTM(PhysionFeatureExtractor):
         return features
 
     def extract_features_ocd(self, videos):
+        if self.n_past > videos.shape[1]:
+            added_frames = self.n_past - videos.shape[1]
+            videos = torch.cat([videos] + [videos[:, -1]]*added_frames, axis=1)
         with torch.no_grad():
-            output = self.model(videos)
-        return output["observed_states"]
+            output = self.model(videos, n_past=videos.shape[1])
+        features = torch.cat([output["input_states"], output["observed_states"]], axis=1)
+        return features
+    
+    
+class DINOV2_LSTM_OCD(DINOV2_LSTM):
+    def __init__(self, weights_path):
+        super().__init__(weights_path, full_rollout=True)
 
 
 from models.mcvd_pytorch.load_model_from_ckpt import load_model, get_readout_sampler, init_samples
