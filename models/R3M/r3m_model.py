@@ -81,7 +81,7 @@ class DINOV2(nn.Module):
     def __init__(self):
         super().__init__()
         from transformers import AutoModel as automodel
-        self.model = automodel.from_pretrained('facebook/dinov2-large')#.to(device).eval()
+        self.model = automodel.from_pretrained('facebook/dinov2-large')
         self.latent_dim = 2048
 
     def forward(self, images):

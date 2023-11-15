@@ -120,9 +120,18 @@ class DINOV2_LSTM(PhysionFeatureExtractor):
         return features
 
     def extract_features_ocd(self, videos):
+        if self.n_past > videos.shape[1]:
+            added_frames = self.n_past - videos.shape[1]
+            videos = torch.cat([videos] + [videos[:, -1]]*added_frames, axis=1)
         with torch.no_grad():
-            output = self.model(videos)
-        return output["observed_states"]
+            output = self.model(videos, n_past=videos.shape[1])
+        features = torch.cat([output["input_states"], output["observed_states"]], axis=1)
+        return features
+    
+    
+class DINOV2_LSTM_OCD(DINOV2_LSTM):
+    def __init__(self, weights_path):
+        super().__init__(weights_path, full_rollout=True)
 
 
 from models.mcvd_pytorch.load_model_from_ckpt import load_model, get_readout_sampler, init_samples
