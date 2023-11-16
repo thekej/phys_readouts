@@ -10,7 +10,8 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision.transforms import ToTensor
 
 from r3m_loader import R3MTrainDataset, DINOTrainDataset, Ego4D
-from r3m_model import FrozenPretrainedEncoder, load_model, pfR3M_LSTM_physion, pfDINO_LSTM_physion
+from r3m_model import FrozenPretrainedEncoder, load_model 
+from r3m_model import pfMAE_LSTM_physion, pfR3M_LSTM_physion, pfDINO_LSTM_physion, pfResNet_LSTM_physion
 
 
 def validate_model(training_logs, model, batch_idx, total_batches,
@@ -50,10 +51,13 @@ def train(args):
     #Load the model
     if args.model_type == 'r3m':
         model = pfR3M_LSTM_physion(n_past=7)
-    else:
+    elif args.model_type == 'dino':
         model = pfDINO_LSTM_physion(n_past=7)
-    model = model.to(device)
-    
+    elif args.model_type == 'resnet':
+        model = pfResNet_LSTM_physion(n_past=7)
+    elif args.model_type == 'mae':
+        model = pfMAE_LSTM_physion(n_past=7)
+    model = model.to(device)    
     
     # Load the dataset
     if args.data_type == 'physion':
@@ -145,19 +149,19 @@ def train(args):
             optimizer.step()
 
             if (batch_idx + 1) % args.log_step == 0:
-                if args.data_type == 'physion':
-                    validate_model(training_logs, model, batch_idx, len(train_loader), 
-                                   val_loader, device, epoch, args, loss, full=False)
-                    model.train()
-                else:
-                    log_sentence = 'Epoch [{}/{}], Step [{}/{}], Loss: {}'.format(epoch+1, args.num_epochs, 
-                                                                                  batch_idx, len(train_loader), 
-                                                                                  loss.item())
-                    print(log_sentence)
-                    training_logs += [log_sentence+'\n']
+                #if args.data_type == 'physion':
+                #    validate_model(training_logs, model, batch_idx, len(train_loader), 
+                #                   val_loader, device, epoch, args, loss, full=False)
+                #    model.train()
+                #else:
+                log_sentence = 'Epoch [{}/{}], Step [{}/{}], Loss: {}'.format(epoch+1, args.num_epochs, 
+                                                                              batch_idx, len(train_loader), 
+                                                                              loss.item())
+                print(log_sentence)
+                training_logs += [log_sentence+'\n']
 
-                    with open(args.log_files, 'w') as f:                    
-                        f.writelines(training_logs)
+                with open(args.log_files, 'w') as f:                    
+                    f.writelines(training_logs)
             if (batch_idx + 1) % args.save_step == 0:
                 torch.save(model.state_dict(), args.save_path + 'checkpoint_%d_%d.pt'%(epoch, batch_idx))
 

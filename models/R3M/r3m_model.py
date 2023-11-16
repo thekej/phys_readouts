@@ -1,7 +1,6 @@
 import numpy as np
 import torch
 import torch.nn as nn
-from .r3m import load_r3m
 from torchvision import transforms
 from collections import OrderedDict
 
@@ -52,6 +51,7 @@ class ID(nn.Module):
 
 class R3M_pretrained(nn.Module):
     def __init__(self):
+        from .r3m import load_r3m
         super().__init__()
         self.r3m = load_r3m("resnet50")
         self.latent_dim = 2048  # resnet50 final fc in_features
@@ -113,6 +113,69 @@ class DINOV2(nn.Module):
         features = features.reshape(bs, -1, features.shape[2])
 
         return features
+    
+class ResNet50(nn.Module):
+    def __init__(self):
+
+        super().__init__()
+        from transformers import ResNetModel
+        self.model = ResNetModel.from_pretrained("microsoft/resnet-50")
+        self.latent_dim = 2048
+
+
+    def forward(self, images):
+        '''
+        images: [B, C, H, W], Image is normalized with imagenet norm
+        '''
+        input_dict = {'pixel_values': images}
+
+        decoder_outputs = self.model(**input_dict, output_hidden_states=True)
+
+        features = decoder_outputs.last_hidden_state
+        
+        features = features.reshape(features.shape[0], -1)
+        
+        features = nn.AdaptiveAvgPool1d(2048)(features.float())
+
+        return features
+
+
+class MAE(nn.Module):
+    def __init__(self):
+        super().__init__()
+        from transformers import ViTMAEForPreTraining as automodel
+        self.model = automodel.from_pretrained('facebook/vit-mae-huge', mask_ratio=0.0)#.to(device).eval()
+        self.latent_dim = 2048
+
+    def forward(self, images):
+        '''
+        images: [B, C, H, W], Image is normalized with imagenet norm
+        '''
+        input_dict = {'pixel_values': images}
+
+        return_dict = self.model.config.use_return_dict
+
+        outputs = self.model.vit(
+            input_dict['pixel_values'],
+            noise=None,
+            head_mask=None,
+            output_attentions=None,
+            output_hidden_states=None,
+            return_dict=return_dict,
+        )
+
+        latent = outputs.last_hidden_state
+        ids_restore = outputs.ids_restore
+
+        decoder_outputs = self.model.decoder(latent, ids_restore, output_hidden_states=True)
+
+        features = decoder_outputs.hidden_states[-4][:, 1:]
+
+        features = features.reshape(features.shape[0], -1)
+        
+        features = nn.AdaptiveAvgPool1d((2048))(features.float())
+        return features
+
 
 # Given sequence of images, predicts next latent
 class FrozenPretrainedEncoder(nn.Module):
@@ -211,6 +274,10 @@ def _get_encoder(encoder):
         return R3M_pretrained
     elif encoder == "dino":
         return DINOV2
+    elif encoder == "resnet":
+        return ResNet50
+    elif encoder == "mae":
+        return MAE
     else:
         raise NotImplementedError(encoder)
 
@@ -231,6 +298,16 @@ def pfR3M_LSTM_physion(n_past=7, **kwargs):
 def pfDINO_LSTM_physion(n_past=7, **kwargs):
     return FrozenPretrainedEncoder(
         encoder="dino", dynamics="lstm", n_past=n_past, **kwargs
+    )
+
+def pfResNet_LSTM_physion(n_past=7, **kwargs):
+    return FrozenPretrainedEncoder(
+        encoder="resnet", dynamics="lstm", n_past=n_past, **kwargs
+    )
+
+def pfMAE_LSTM_physion(n_past=7, **kwargs):
+    return FrozenPretrainedEncoder(
+        encoder="mae", dynamics="lstm", n_past=n_past, **kwargs
     )
 
 def pfR3M_ID(n_past=7, **kwargs):
