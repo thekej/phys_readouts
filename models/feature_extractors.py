@@ -111,7 +111,7 @@ class R3M_LSTM_OCD(R3M_LSTM):
     def __init__(self, weights_path):
         super().__init__(weights_path, full_rollout=True)
 
-class R3M_LSTM_SIM(PN_LSTM):
+class R3M_LSTM_SIM(R3M_LSTM):
     def __init__(self, weights_path):
         super().__init__(weights_path, full_rollout=True)
 
@@ -159,7 +159,7 @@ class DINOV2_LSTM_OCD(DINOV2_LSTM):
     def __init__(self, weights_path):
         super().__init__(weights_path, full_rollout=True)
 
-class DINOV2_LSTM_SIM(PN_LSTM):
+class DINOV2_LSTM_SIM(DINOV2_LSTM):
     def __init__(self, weights_path):
         super().__init__(weights_path, full_rollout=True)
         
@@ -279,7 +279,7 @@ class MCVD(PhysionFeatureExtractor):
                                         num_frames_pred=self.config.data.num_frames,
                                         prob_mask_cond=getattr(self.config.data, 'prob_mask_cond', 0.0),
                                         prob_mask_future=getattr(self.config.data, 'prob_mask_future', 0.0))
-                cond = torch.cat((cond[:, 3:, :, :], pred), dim=1)
+                cond = torch.cat((cond[:, 3:, :, :], pred.cuda()), dim=1)
                 
             init = init_samples(len(real), self.config)
             with torch.no_grad():
