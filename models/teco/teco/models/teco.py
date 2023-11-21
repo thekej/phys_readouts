@@ -130,7 +130,9 @@ class TECO(nn.Module):
         sos = jnp.asarray(sos, self.dtype)
 
         inp = jnp.concatenate([sos, inp], axis=1)
+
         deter = self.z_tfm(inp, mask=self._init_mask(), deterministic=deterministic)
+
         deter = deter[:, self.config.n_cond:]
 
         deter = jax.vmap(self.z_unproj, 1, 1)(deter)

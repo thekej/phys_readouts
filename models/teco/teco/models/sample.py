@@ -164,7 +164,7 @@ def readout_h_run(sample_model, state, video, actions, seed=0, state_spec=None, 
     return readout_embed 
 
 def readout_z_run(sample_model, state, video, actions, seed=0, state_spec=None, 
-                  scenario='complete', seq_len=50, open_loop_ctx=12):
+                  scenario='simulation', seq_len=50, open_loop_ctx=12):
     global model
     model = sample_model
 
@@ -180,7 +180,7 @@ def readout_z_run(sample_model, state, video, actions, seed=0, state_spec=None,
     assert video.shape[0] == num_local_data, f'{video.shape}, {num_local_data}'
 
     actions = jnp.zeros(video.shape[:3], dtype=jnp.int32)
-    print(actions.shape, 'test')
+
     if video.shape[0] < jax.local_device_count():
         devices = jax.local_devices()[:video.shape[0]]
     else:
@@ -212,12 +212,11 @@ def readout_z_run(sample_model, state, video, actions, seed=0, state_spec=None,
     for i in tqdm(itr):
         act = actions[:, :, :seq_len]
         r, z, h, rngs = p_imagine(state, zs, act, cond, i, rngs)
-        z_hats.append(jax.numpy.asarray(z))
         hs.append(jax.numpy.asarray(h))
         if scenario == 'simulation':
             zs = zs.at[:, :, i - model.config.n_cond].set(z)
-        recon.append(jax.numpy.asarray(r))
-    encodings = np.stack(recon, axis=2)
-    z_hats = np.stack(z_hats, axis=2)
+        #recon.append(jax.numpy.asarray(r))
+    #encodings = np.stack(recon, axis=2)
+    #z_hats = np.stack(z_hats, axis=2)
     hs = np.stack(hs, axis=2)
-    return encodings, z_hats, hs
+    return hs

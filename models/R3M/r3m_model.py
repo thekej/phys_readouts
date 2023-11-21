@@ -82,7 +82,7 @@ class DINOV2(nn.Module):
         super().__init__()
         from transformers import AutoModel as automodel
         self.model = automodel.from_pretrained('facebook/dinov2-large')
-        self.latent_dim = 2048
+        self.latent_dim = 8192
 
     def forward(self, images):
         '''
@@ -95,7 +95,7 @@ class DINOV2(nn.Module):
         features = decoder_outputs.last_hidden_state
         
         features_1 = features[:, 0].unsqueeze(1)
-        features_2 = nn.AdaptiveAvgPool2d((1, 1024))(features[:, 1:].float())
+        features_2 = nn.AdaptiveAvgPool2d((1, 8192))(features[:, 1:].float())
         
         features = torch.cat((features_1, features_2), dim=1)
         return features
@@ -120,7 +120,7 @@ class ResNet50(nn.Module):
         super().__init__()
         from transformers import ResNetModel
         self.model = ResNetModel.from_pretrained("microsoft/resnet-50")
-        self.latent_dim = 2048
+        self.latent_dim = 8192
 
 
     def forward(self, images):
@@ -135,7 +135,7 @@ class ResNet50(nn.Module):
         
         features = features.reshape(features.shape[0], -1)
         
-        features = nn.AdaptiveAvgPool1d(2048)(features.float())
+        features = nn.AdaptiveAvgPool1d(8192)(features.float())
 
         return features
 
@@ -145,7 +145,7 @@ class MAE(nn.Module):
         super().__init__()
         from transformers import ViTMAEForPreTraining as automodel
         self.model = automodel.from_pretrained('facebook/vit-mae-huge', mask_ratio=0.0)#.to(device).eval()
-        self.latent_dim = 2048
+        self.latent_dim = 8192
 
     def forward(self, images):
         '''
@@ -173,7 +173,7 @@ class MAE(nn.Module):
 
         features = features.reshape(features.shape[0], -1)
         
-        features = nn.AdaptiveAvgPool1d((2048))(features.float())
+        features = nn.AdaptiveAvgPool1d((8192))(features.float())
         return features
 
 

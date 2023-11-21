@@ -95,8 +95,23 @@ class R3M_LSTM(PhysionFeatureExtractor):
             output = self.model(videos, n_past=videos.shape[1])
         features = torch.cat([output["input_states"], output["observed_states"]], axis=1)
         return features
+    
+    def extract_features_sim(self, videos):
+        sim_length = 25
+        if sim_length > videos.shape[1]:
+            added_frames = sim_lengh - videos.shape[1]
+            videos = torch.cat([videos] + [videos[:, -1]]*added_frames, axis=1)
+
+        with torch.no_grad():
+            output = self.model(videos[:, :sim_length])
+        features = output["states"]
+        return features
 
 class R3M_LSTM_OCD(R3M_LSTM):
+    def __init__(self, weights_path):
+        super().__init__(weights_path, full_rollout=True)
+
+class R3M_LSTM_SIM(PN_LSTM):
     def __init__(self, weights_path):
         super().__init__(weights_path, full_rollout=True)
 
@@ -129,11 +144,25 @@ class DINOV2_LSTM(PhysionFeatureExtractor):
         features = torch.cat([output["input_states"], output["observed_states"]], axis=1)
         return features
     
+    def extract_features_sim(self, videos):
+        sim_length = 25
+        if sim_length > videos.shape[1]:
+            added_frames = sim_lengh - videos.shape[1]
+            videos = torch.cat([videos] + [videos[:, -1]]*added_frames, axis=1)
+
+        with torch.no_grad():
+            output = self.model(videos[:, :sim_length])
+        features = output["states"]
+        return features
     
 class DINOV2_LSTM_OCD(DINOV2_LSTM):
     def __init__(self, weights_path):
         super().__init__(weights_path, full_rollout=True)
 
+class DINOV2_LSTM_SIM(PN_LSTM):
+    def __init__(self, weights_path):
+        super().__init__(weights_path, full_rollout=True)
+        
 
 from models.mcvd_pytorch.load_model_from_ckpt import load_model, get_readout_sampler, init_samples
 from models.mcvd_pytorch.datasets import data_transform
@@ -202,6 +231,65 @@ class MCVD(PhysionFeatureExtractor):
             output +=  [mid]
         return torch.stack(output, axis=1)
     
+    def extract_features_sim(self, videos):
+        #videos = torch.stack([self.transform_video_tensor(vid) for vid in videos])
+        input_frames = data_transform(self.config, videos)
+        output = []
+        if self.model_type == 'ucf':
+            real, cond, cond_mask = conditioning_fn(config, input_frames[:, 8:16, :, :, :],
+                                                    num_frames_pred=config.data.num_frames,
+                                            prob_mask_cond=getattr(config.data, 'prob_mask_cond', 0.0),
+                                            prob_mask_future=getattr(config.data, 'prob_mask_future', 0.0))
+        else:
+            real, cond, cond_mask = conditioning_fn(self.config, 
+                                                    input_frames[:, 
+                                                    :self.config.data.num_frames_cond+self.config.data.num_frames, 
+                                                    :, :, :], 
+                                        num_frames_pred=self.config.data.num_frames,
+                                        prob_mask_cond=getattr(self.config.data, 'prob_mask_cond', 0.0),
+                                        prob_mask_future=getattr(self.config.data, 'prob_mask_future', 0.0))
+
+        init = init_samples(len(real), self.config)
+        with torch.no_grad():
+            pred, gamma, beta, mid = self.sampler(init, self.scorenet, cond=cond,
+                                     cond_mask=cond_mask,
+                                     subsample=100, verbose=True)
+        output +=  [mid]
+        
+        if self.model_type == 'ucf':
+            sim_length = 5
+        else:
+            sim_length = 20
+        
+        for j in range(1, sim_length):
+            if self.model_type == 'ucf':
+                real, cond_, cond_mask = conditioning_fn(self.config, 
+                                                    input_frames[:, 
+                                                    8+4*j:4*j+16, 
+                                                    :, :, :], 
+                                        num_frames_pred=self.config.data.num_frames,
+                                        prob_mask_cond=getattr(self.config.data, 'prob_mask_cond', 0.0),
+                                        prob_mask_future=getattr(self.config.data, 'prob_mask_future', 0.0))
+                cond = pred
+            else:
+                real, cond_, cond_mask = conditioning_fn(self.config, 
+                                                    input_frames[:, 
+                                                    j:j+self.config.data.num_frames_cond+self.config.data.num_frames, 
+                                                    :, :, :], 
+                                        num_frames_pred=self.config.data.num_frames,
+                                        prob_mask_cond=getattr(self.config.data, 'prob_mask_cond', 0.0),
+                                        prob_mask_future=getattr(self.config.data, 'prob_mask_future', 0.0))
+                cond = torch.cat((cond[:, 3:, :, :], pred), dim=1)
+                
+            init = init_samples(len(real), self.config)
+            with torch.no_grad():
+                pred, gamma, beta, mid = self.sampler(init, self.scorenet, cond=cond,
+                                         cond_mask=cond_mask,
+                                         subsample=100, verbose=True)
+            
+            output +=  [mid]
+        return torch.stack(output, axis=1)
+    
 class MCVD_PHYSION(MCVD):
     def __init__(self, weights_path):
         super().__init__(weights_path, model_type='physion')
@@ -240,6 +328,12 @@ class FITVID(PhysionFeatureExtractor):
         return DataAugmentationForVideoMAE(False, 64), 60, 25
 
     def extract_features(self, videos):
+        with torch.no_grad():
+            output = self.model(videos, n_past=7)
+        features = output['h_preds']
+        return features[:, :7]
+    
+    def extract_features_sim(self, videos):
         with torch.no_grad():
             output = self.model(videos, n_past=7)
         features = output['h_preds']
