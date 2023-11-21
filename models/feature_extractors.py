@@ -236,10 +236,10 @@ class MCVD(PhysionFeatureExtractor):
         input_frames = data_transform(self.config, videos)
         output = []
         if self.model_type == 'ucf':
-            real, cond, cond_mask = conditioning_fn(config, input_frames[:, 8:16, :, :, :],
-                                                    num_frames_pred=config.data.num_frames,
-                                            prob_mask_cond=getattr(config.data, 'prob_mask_cond', 0.0),
-                                            prob_mask_future=getattr(config.data, 'prob_mask_future', 0.0))
+            real, cond, cond_mask = conditioning_fn(self.config, input_frames[:, 8:16, :, :, :],
+                                                    num_frames_pred=self.config.data.num_frames,
+                                            prob_mask_cond=getattr(self.config.data, 'prob_mask_cond', 0.0),
+                                            prob_mask_future=getattr(self.config.data, 'prob_mask_future', 0.0))
         else:
             real, cond, cond_mask = conditioning_fn(self.config, 
                                                     input_frames[:, 
