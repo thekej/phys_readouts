@@ -159,6 +159,9 @@ class DINOV2_LSTM_OCD(DINOV2_LSTM):
     def __init__(self, weights_path):
         super().__init__(weights_path, full_rollout=True)
 
+    def transform(self):
+        return DataAugmentationForVideoMAE(True, 224), 60, 66
+
 class DINOV2_LSTM_SIM(DINOV2_LSTM):
     def __init__(self, weights_path):
         super().__init__(weights_path, full_rollout=True)
@@ -207,6 +210,9 @@ class ResNet_LSTM_OCD(ResNet_LSTM):
     def __init__(self, weights_path):
         super().__init__(weights_path, full_rollout=True)
 
+    def transform(self):
+        return DataAugmentationForVideoMAE(True, 224), 60, 66
+
 class ResNet_LSTM_SIM(ResNet_LSTM):
     def __init__(self, weights_path):
         super().__init__(weights_path, full_rollout=True)
@@ -253,6 +259,9 @@ class MAE_LSTM(PhysionFeatureExtractor):
 class MAE_LSTM_OCD(MAE_LSTM):
     def __init__(self, weights_path):
         super().__init__(weights_path, full_rollout=True)
+
+    def transform(self):
+        return DataAugmentationForVideoMAE(True, 224), 60, 66
 
 class MAE_LSTM_SIM(MAE_LSTM):
     def __init__(self, weights_path):
