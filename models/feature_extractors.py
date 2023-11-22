@@ -164,6 +164,100 @@ class DINOV2_LSTM_SIM(DINOV2_LSTM):
         super().__init__(weights_path, full_rollout=True)
         
 
+class ResNet_LSTM(PhysionFeatureExtractor):
+    def __init__(self, weights_path, n_past=7, full_rollout=False):
+        super().__init__()
+        from models.R3M.r3m_model import pfResNet_LSTM_physion, load_model
+        self.model = pfResNet_LSTM_physion(n_past=n_past, full_rollout=full_rollout)
+        self.model = load_model(self.model, weights_path)
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.model = self.model.to(device)
+        self.n_past = n_past
+
+    def transform(self):
+        return DataAugmentationForVideoMAE(True, 224), 60, 25
+
+    def extract_features(self, videos):
+        with torch.no_grad():
+            output = self.model(videos[:, -self.model.n_past:])
+        features = output["input_states"]
+        return features
+
+    def extract_features_ocd(self, videos):
+        if self.n_past > videos.shape[1]:
+            added_frames = self.n_past - videos.shape[1]
+            videos = torch.cat([videos] + [videos[:, -1]]*added_frames, axis=1)
+        with torch.no_grad():
+            output = self.model(videos, n_past=videos.shape[1])
+        features = torch.cat([output["input_states"], output["observed_states"]], axis=1)
+        return features
+
+    def extract_features_sim(self, videos):
+        sim_length = 25
+        if sim_length > videos.shape[1]:
+            added_frames = sim_lengh - videos.shape[1]
+            videos = torch.cat([videos] + [videos[:, -1]]*added_frames, axis=1)
+
+        with torch.no_grad():
+            output = self.model(videos[:, :sim_length])
+        features = output["states"]
+        return features
+
+class ResNet_LSTM_OCD(ResNet_LSTM):
+    def __init__(self, weights_path):
+        super().__init__(weights_path, full_rollout=True)
+
+class ResNet_LSTM_SIM(ResNet_LSTM):
+    def __init__(self, weights_path):
+        super().__init__(weights_path, full_rollout=True)
+
+class MAE_LSTM(PhysionFeatureExtractor):
+    def __init__(self, weights_path, n_past=7, full_rollout=False):
+        super().__init__()
+        from models.R3M.r3m_model import pfMAE_LSTM_physion, load_model
+        self.model = pfMAE_LSTM_physion(n_past=n_past, full_rollout=full_rollout)
+        self.model = load_model(self.model, weights_path)
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.model = self.model.to(device)
+        self.n_past = n_past
+
+    def transform(self):
+        return DataAugmentationForVideoMAE(True, 224), 60, 25
+
+    def extract_features(self, videos):
+        with torch.no_grad():
+            output = self.model(videos[:, -self.model.n_past:])
+        features = output["input_states"]
+        return features
+
+    def extract_features_ocd(self, videos):
+        if self.n_past > videos.shape[1]:
+            added_frames = self.n_past - videos.shape[1]
+            videos = torch.cat([videos] + [videos[:, -1]]*added_frames, axis=1)
+        with torch.no_grad():
+            output = self.model(videos, n_past=videos.shape[1])
+        features = torch.cat([output["input_states"], output["observed_states"]], axis=1)
+        return features
+
+    def extract_features_sim(self, videos):
+        sim_length = 25
+        if sim_length > videos.shape[1]:
+            added_frames = sim_lengh - videos.shape[1]
+            videos = torch.cat([videos] + [videos[:, -1]]*added_frames, axis=1)
+
+        with torch.no_grad():
+            output = self.model(videos[:, :sim_length])
+        features = output["states"]
+        return features
+
+class MAE_LSTM_OCD(MAE_LSTM):
+    def __init__(self, weights_path):
+        super().__init__(weights_path, full_rollout=True)
+
+class MAE_LSTM_SIM(MAE_LSTM):
+    def __init__(self, weights_path):
+        super().__init__(weights_path, full_rollout=True)
+
 from models.mcvd_pytorch.load_model_from_ckpt import load_model, get_readout_sampler, init_samples
 from models.mcvd_pytorch.datasets import data_transform
 from models.mcvd_pytorch.runners.ncsn_runner import conditioning_fn
