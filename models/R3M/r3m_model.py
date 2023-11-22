@@ -93,10 +93,8 @@ class DINOV2(nn.Module):
         decoder_outputs = self.model(**input_dict, output_hidden_states=True)
 
         features = decoder_outputs.last_hidden_state
-        
-        features_1 = features[:, 0].unsqueeze(1)
-        features_2 = nn.AdaptiveAvgPool2d((1, 8192))(features[:, 1:].float())
-        
+        features_1 = features[:, 0]
+        features_2 = nn.AdaptiveAvgPool1d((7168))(features[:, 1:].reshape(features.shape[0], -1).float())
         features = torch.cat((features_1, features_2), dim=1)
         return features
 
