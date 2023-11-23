@@ -58,7 +58,7 @@ class SGNN(nn.Module):
                 raise RuntimeError('Unknown object material')
         return ret
 
-    def forward(self, x_p, v_p, h_p, obj_id, obj_type):
+    def forward(self, x_p, v_p, h_p, obj_id, obj_type, obj_yellow, obj_red):
         try:
             h_p[x_p[..., 1] < 0.1, -1] = 1
         except:
@@ -99,6 +99,11 @@ class SGNN(nn.Module):
         edge_index_o, edge_attr_o_f, edge_attr_o_s = edge_index_o[..., mask], edge_attr_o_f[mask], edge_attr_o_s[mask]
         f_o_, s_o_ = self.object_message_passing(f_o[..., 1:], s_o, edge_index_o, edge_attr_o_f, edge_attr_o_s)  # [N_obj, 3, 2]
 
+        # reorder given yellow and red first
+        # pad to max number of objects
+        # Get the elements at index1 and index2
+        result = get_obj_feats(s_o_, obj_yellow, obj_red)
+        
         edge_attr_inner_f = (x_p[edge_index_inner[0]] - x_p[edge_index_inner[1]]).unsqueeze(-1)  # [M_in, 3, 1]
         f_p_ = torch.cat((f_o_[obj_id], f_p), dim=-1)
         s_p_ = torch.cat((s_o_[obj_id], s_p), dim=-1)
@@ -111,7 +116,7 @@ class SGNN(nn.Module):
 
         f_p_, s_p_ = self.object_to_particle(f_p_, s_p_, edge_index_inner, edge_attr_inner_f)  # [N, 3, x], [N, H]
         v_out = self.predictor(x_p, f_p_, s_p_, obj_id, obj_type, num_obj)  # [N, 3]
-        return v_out
+        return v_out, result
     
     def extract(self, x_p, v_p, h_p, obj_id, obj_type):
         try:
@@ -236,5 +241,29 @@ class SGNN(nn.Module):
         result = torch.cat([result, zero_tensor.cuda()], dim=0)
 
         return result
+    
+def get_obj_feats(s_o_, obj_yellow, obj_red):
+    element1 = s_o_[obj_yellow].unsqueeze(0)
+    element2 = s_o_[obj_red].unsqueeze(0)
+
+    # Get all the other elements except the ones at index1 and index2
+    other_elements_mask = torch.ones(s_o_.size(0), dtype=torch.bool)
+    other_elements_mask[obj_yellow] = 0
+    other_elements_mask[obj_red] = 0
+    other_elements = s_o_[other_elements_mask]
+
+    # Concatenate the tensors
+    result = torch.cat([element1, element2, other_elements], dim=0)
+
+    # Determine how much zero padding is needed
+    padding_rows = 12 - result.size(0)
+
+    # Create the zero tensor for padding
+    zero_tensor = torch.zeros((padding_rows, result.size(1)))
+
+    # Concatenate the reordered tensor with the zero tensor
+    result = torch.cat([result, zero_tensor.cuda()], dim=0)
+
+    return result
 
 

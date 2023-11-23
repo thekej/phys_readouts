@@ -75,8 +75,6 @@ parser.add_argument('--debug', type=int, default=0)
 parser.add_argument('--n_instances', type=int, default=0)
 parser.add_argument('--n_stages', type=int, default=0)
 parser.add_argument('--n_his', type=int, default=0)
-parser.add_argument('--augment_worldcoord', type=int, default=0)
-parser.add_argument('--floor_cheat', type=int, default=0)
 # shape state:
 # [x, y, z, x_last, y_last, z_last, quat(4), quat_last(4)]
 parser.add_argument('--shape_state_dim', type=int, default=14)
@@ -98,6 +96,7 @@ parser.add_argument('--save_pred', type=int, default=1)
 parser.add_argument('--save_file_ocp', type=str)
 parser.add_argument('--save_file_ocd', type=str)
 parser.add_argument('--save_file_focused', type=str)
+parser.add_argument('--save_file_sim', type=str)
 
 args = parser.parse_args()
 
@@ -240,7 +239,7 @@ for trial_id, trial_name in enumerate(trial_full_paths):
     for key in all_scenarios.keys():
         if key in trial_name:
             all_scenarios[key].append(trial_id)
-
+            
     gt_node_rs_idxs = []
     args.time_step = len([file for file in os.listdir(trial_name) if file.endswith(".h5")]) - 1
 
@@ -303,25 +302,26 @@ for trial_id, trial_name in enumerate(trial_full_paths):
         
     n_actual_frames = len(timesteps)
     
-    indices_ocd_focussed = np.arange(frame_label + 15, (frame_label - 31), -40//10).clip(1, n_actual_frames - 1)[::-1]
-    # if size of indices if less than self.num_frames, then repeat the first frame
-    if len(indices_ocd_focussed) < 12:
-        indices_ocd_focussed = np.concatenate([np.array([indices_ocd_focussed[0]] * (12 - len(indices_ocd_focussed))),
-                                               indices_ocd_focussed])
+    # used for training heuristic on  detection
+    indices_ocd_focussed = [frame_label]
 
     indices_ocd = np.arange(1, n_actual_frames, 40 // 10)
+    
 
     if 'collide' in trial_name:
         max_frame = 15
     else:
         max_frame = 45
 
-    indices_ocp = np.arange(max_frame+1, 1, -40 // 10).clip(1, n_actual_frames - 1)[::-1]
+    indices_ocp = np.arange(max_frame, 0, -40 // 10).clip(0, n_actual_frames - 1)[::-1]
     if len(indices_ocp) < 12:
         indices_ocp = np.concatenate([np.array([indices_ocp[0]] * (12 - len(indices_ocp))), 
                                       indices_ocp])
+        
+    indices_sim = np.arange(max_frame, 225, 40//10).clip(1, n_actual_frames - 1)
 
-    ocp_entry, ocd_entry, focus_entry = [], [], []
+
+    ocp_entry, ocd_entry, focus_entry, simulation = [], [], [], []
     for entry, start_timestep in enumerate(range(1, n_actual_frames)):
         
         ocp_flag, ocd_flag, focus_flag = False, False, False
@@ -400,6 +400,73 @@ for trial_id, trial_name in enumerate(trial_full_paths):
     ocd += [np.stack(ocd_entry)]
     ocd_focused += [np.stack(focus_entry)]
     
+    sim = ocp_entry
+    
+    for current_fid in range(45, min(n_actual_frames, 225)):
+        x = data[0]
+        v = data[1]
+        h = np.zeros((x.shape[0], 4))
+        obj_id = np.zeros_like(x)[..., 0]
+        obj_type = []
+        instance_idx = phases_dict['instance_idx']
+        for i in range(len(instance_idx) - 1):
+            obj_id[instance_idx[i]:instance_idx[i + 1]] = i
+            obj_type.append(phases_dict['material'][i])
+            if phases_dict['material'][i] == 'rigid':
+                h[instance_idx[i]:instance_idx[i + 1], 0] = 1
+            elif phases_dict['material'][i] in ['cloth', 'fluid']:
+                h[instance_idx[i]:instance_idx[i + 1], 1] = 1
+        x = torch.Tensor(x)
+        v = torch.Tensor(v)
+        h = torch.Tensor(h)
+        obj_id = torch.LongTensor(obj_id)
+
+        buf = [x, v, h, obj_id]
+
+        with torch.set_grad_enabled(False):
+            if use_gpu:
+                for d in range(len(buf)):
+                    if type(buf[d]) == list:
+                        for t in range(len(buf[d])):
+                            buf[d][t] = Variable(buf[d][t].cuda())
+                    else:
+                        buf[d] = Variable(buf[d].cuda())
+            else:
+                for d in range(len(buf)):
+                    if type(buf[d]) == list:
+                        for t in range(len(buf[d])):
+                            buf[d][t] = Variable(buf[d][t])
+                    else:
+                        buf[d] = Variable(buf[d])
+            x, v, h, obj_id = buf
+
+            vels, feats = model(x, v, h, obj_id, obj_type, phases_dict['yellow_id'], phases_dict['red_id'])
+            if current_fid in indices_sim:
+                sim += [feats.cpu().numpy()]
+                
+        vels = denormalize([vels.data.cpu().numpy()], [stat[1]])[0]
+        if args.ransac_on_pred:
+            positions_prev = data[0]
+            predicted_positions = data[0] + vels * dt
+            for obj_id in range(len(instance_idx) - 1):
+                st, ed = instance_idx[obj_id], instance_idx[obj_id + 1]
+                if phases_dict['material'][obj_id] == 'rigid':
+
+                    pos_prev = positions_prev[st:ed]
+                    pos_pred = predicted_positions[st:ed]
+
+                    R, T = calc_rigid_transform(pos_prev, pos_pred)
+                    refined_pos = (np.dot(R, pos_prev.T) + T).T
+
+                    predicted_positions[st:ed, :] = refined_pos
+            data[0] = predicted_positions
+            data[1] = (predicted_positions - positions_prev)/dt
+        else:
+            data[0] = data[0] + vels * dt
+            data[1][:, :args.position_dim] = vels
+
+    simulation += [np.stack(sim)]
+    
 max_dim = max([x.shape[0] for x in ocd])
 
 for ct, f in enumerate(ocd):
@@ -423,10 +490,10 @@ with h5py.File(args.save_file_ocp,'w') as hf:
     hf.create_dataset("filenames", data=filenames, dtype=dt)
     
 import json
-with open('/ccn2/u/thekej/models/sgnn_physion/ocp/test_scenario_map.json', 'w') as f:
+with open('/ccn2/u/thekej/models/sgnn_physion/ocp/test_json.json', 'w') as f:
     json.dump(stimulus_map, f)
     
-with open('/ccn2/u/thekej/models/sgnn_physion/ocp/test_json.json', 'w') as f:
+with open('/ccn2/u/thekej/models/sgnn_physion/ocp/test_scenario_map.json', 'w') as f:
     json.dump(all_scenarios, f)
 
 print('save 2')
@@ -436,10 +503,10 @@ with h5py.File(args.save_file_ocd ,'w') as hf:
     hf.create_dataset("contacts", data=np.concatenate(contacts))
     hf.create_dataset("filenames", data=filenames, dtype=dt)
     
-with open('/ccn2/u/thekej/models/sgnn_physion/ocd/test_scenario_map.json', 'w') as f:
+with open('/ccn2/u/thekej/models/sgnn_physion/ocd/test_json.json', 'w') as f:
     json.dump(stimulus_map, f)
     
-with open('/ccn2/u/thekej/models/sgnn_physion/ocd/test_json.json', 'w') as f:
+with open('/ccn2/u/thekej/models/sgnn_physion/ocd/test_scenario_map.json', 'w') as f:
     json.dump(all_scenarios, f)
 
 print('save 3')
@@ -449,10 +516,22 @@ with h5py.File(args.save_file_focused ,'w') as hf:
     hf.create_dataset("contacts", data=np.concatenate(contacts))
     hf.create_dataset("filenames", data=filenames, dtype=dt)
 
-with open('/ccn2/u/thekej/models/sgnn_physion/ocd_focussed/test_scenario_map.json', 'w') as f:
+with open('/ccn2/u/thekej/models/sgnn_physion/ocd_focussed/test_json.json', 'w') as f:
     json.dump(stimulus_map, f)
     
+with open('/ccn2/u/thekej/models/sgnn_physion/ocd_focussed/test_scenario_map.json', 'w') as f:
+    json.dump(all_scenarios, f)
+
+print('save 4')
+with h5py.File(args.save_file_sim ,'w') as hf:
+    hf.create_dataset("features", data=np.stack(simulation))
+    hf.create_dataset("label", data=np.array(labels))
+    hf.create_dataset("contacts", data=np.concatenate(contacts))
+    hf.create_dataset("filenames", data=filenames, dtype=dt)
+
 with open('/ccn2/u/thekej/models/sgnn_physion/ocd_focussed/test_json.json', 'w') as f:
+    json.dump(stimulus_map, f)
+    
+with open('/ccn2/u/thekej/models/sgnn_physion/ocd_focussed/test_scenario_map.json', 'w') as f:
     json.dump(all_scenarios, f)
     
-
