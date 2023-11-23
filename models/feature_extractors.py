@@ -79,7 +79,7 @@ class R3M_LSTM(PhysionFeatureExtractor):
         self.n_past = n_past
 
     def transform(self):
-        return DataAugmentationForVideoMAE(False, 224), 60, 25
+        return DataAugmentationForVideoMAE(False, 224), 60, 33
 
     def extract_features(self, videos):
         with torch.no_grad():
@@ -97,7 +97,7 @@ class R3M_LSTM(PhysionFeatureExtractor):
         return features
     
     def extract_features_sim(self, videos):
-        sim_length = 25
+        sim_length = 33
         if sim_length > videos.shape[1]:
             added_frames = sim_lengh - videos.shape[1]
             videos = torch.cat([videos] + [videos[:, -1]]*added_frames, axis=1)
@@ -127,7 +127,7 @@ class DINOV2_LSTM(PhysionFeatureExtractor):
         self.n_past = n_past
         
     def transform(self):
-        return DataAugmentationForVideoMAE(True, 224), 60, 25
+        return DataAugmentationForVideoMAE(True, 224), 60, 33
 
     def extract_features(self, videos):
         with torch.no_grad():
@@ -145,7 +145,7 @@ class DINOV2_LSTM(PhysionFeatureExtractor):
         return features
     
     def extract_features_sim(self, videos):
-        sim_length = 25
+        sim_length = 33
         if sim_length > videos.shape[1]:
             added_frames = sim_lengh - videos.shape[1]
             videos = torch.cat([videos] + [videos[:, -1]]*added_frames, axis=1)
@@ -178,7 +178,7 @@ class ResNet_LSTM(PhysionFeatureExtractor):
         self.n_past = n_past
 
     def transform(self):
-        return DataAugmentationForVideoMAE(True, 224), 60, 25
+        return DataAugmentationForVideoMAE(True, 224), 60, 33
 
     def extract_features(self, videos):
         with torch.no_grad():
@@ -196,7 +196,7 @@ class ResNet_LSTM(PhysionFeatureExtractor):
         return features
 
     def extract_features_sim(self, videos):
-        sim_length = 25
+        sim_length = 33
         if sim_length > videos.shape[1]:
             added_frames = sim_lengh - videos.shape[1]
             videos = torch.cat([videos] + [videos[:, -1]]*added_frames, axis=1)
@@ -228,7 +228,7 @@ class MAE_LSTM(PhysionFeatureExtractor):
         self.n_past = n_past
 
     def transform(self):
-        return DataAugmentationForVideoMAE(True, 224), 60, 25
+        return DataAugmentationForVideoMAE(True, 224), 60, 33
 
     def extract_features(self, videos):
         with torch.no_grad():
@@ -246,7 +246,7 @@ class MAE_LSTM(PhysionFeatureExtractor):
         return features
 
     def extract_features_sim(self, videos):
-        sim_length = 25
+        sim_length = 33
         if sim_length > videos.shape[1]:
             added_frames = sim_lengh - videos.shape[1]
             videos = torch.cat([videos] + [videos[:, -1]]*added_frames, axis=1)
