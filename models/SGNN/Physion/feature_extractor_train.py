@@ -392,9 +392,6 @@ for trial_id, trial_name in enumerate(trial_full_paths):
     if len(ocp_entry) < 12:
         ocp_entry = np.concatenate([np.array([ocp_entry[0]] * (12 - len(ocp_entry))),
                                                ocp_entry])
-    if len(focus_entry) < 12:
-        focus_entry = np.concatenate([np.array([focus_entry[0]] * (12 - len(focus_entry))),
-                                               focus_entry])
 
     ocp += [np.stack(ocp_entry)]
     ocd += [np.stack(ocd_entry)]
@@ -529,10 +526,10 @@ with h5py.File(args.save_file_sim ,'w') as hf:
     hf.create_dataset("contacts", data=np.concatenate(contacts))
     hf.create_dataset("filenames", data=filenames, dtype=dt)
 
-with open('/ccn2/u/thekej/models/sgnn_physion/ocd_focussed/train_json.json', 'w') as f:
+with open('/ccn2/u/thekej/models/sgnn_physion/sim/train_json.json', 'w') as f:
     json.dump(stimulus_map, f)
     
-with open('/ccn2/u/thekej/models/sgnn_physion/ocd_focussed/train_scenario_map.json', 'w') as f:
+with open('/ccn2/u/thekej/models/sgnn_physion/sim/train_scenario_map.json', 'w') as f:
     json.dump(all_scenarios, f)
     
 
