@@ -223,7 +223,7 @@ trial_full_paths = trial_full_paths#[3000:3010]
 #trial_full_paths = random.sample(trial_full_paths, 50)
 
 # set up new dataset
-ocp, ocd, ocd_focused = [], [], []
+ocp, ocd, ocd_focused, simulation = [], [], [], []
 labels = []
 contacts = []
 filenames = []
@@ -259,6 +259,9 @@ for trial_id, trial_name in enumerate(trial_full_paths):
     labels += [phases_dict["label"]]
     contacts += [phases_dict["contact"]]
     frame_label = phases_dict["collision_ind"]
+
+    if frame_label == max_timestep:
+        frame_label = max_timestep / 2
 
     if args.test_training_data_processing:
         is_bad_chair = correct_bad_chair(phases_dict)
@@ -320,8 +323,8 @@ for trial_id, trial_name in enumerate(trial_full_paths):
         
     indices_sim = np.arange(max_frame, 225, 40//10).clip(1, n_actual_frames - 1)
 
-
-    ocp_entry, ocd_entry, focus_entry, simulation = [], [], [], []
+    
+    ocp_entry, ocd_entry, focus_entry = [], [], []
     for entry, start_timestep in enumerate(range(1, n_actual_frames)):
         
         ocp_flag, ocd_flag, focus_flag = False, False, False
@@ -463,7 +466,7 @@ for trial_id, trial_name in enumerate(trial_full_paths):
             data[1][:, :args.position_dim] = vels
 
     simulation += [np.stack(sim)]
-    
+
 max_dim = max([x.shape[0] for x in ocd])
 
 for ct, f in enumerate(ocd):

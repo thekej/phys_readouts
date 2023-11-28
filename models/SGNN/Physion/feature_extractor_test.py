@@ -223,7 +223,7 @@ trial_full_paths = trial_full_paths#[3000:3010]
 #trial_full_paths = random.sample(trial_full_paths, 50)
 
 # set up new dataset
-ocp, ocd, ocd_focused = [], [], []
+ocp, ocd, ocd_focused, simulation = [], [], [], []
 labels = []
 contacts = []
 filenames = []
@@ -321,7 +321,7 @@ for trial_id, trial_name in enumerate(trial_full_paths):
     indices_sim = np.arange(max_frame, 225, 40//10).clip(1, n_actual_frames - 1)
 
 
-    ocp_entry, ocd_entry, focus_entry, simulation = [], [], [], []
+    ocp_entry, ocd_entry, focus_entry = [], [], []
     for entry, start_timestep in enumerate(range(1, n_actual_frames)):
         
         ocp_flag, ocd_flag, focus_flag = False, False, False
@@ -531,4 +531,3 @@ with open('/ccn2/u/thekej/models/sgnn_physion/sim/test_json.json', 'w') as f:
     
 with open('/ccn2/u/thekej/models/sgnn_physion/sim/test_scenario_map.json', 'w') as f:
     json.dump(all_scenarios, f)
-    
