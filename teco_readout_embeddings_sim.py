@@ -53,7 +53,6 @@ def main(args):
         contact_in = batch['contacts'].reshape(-1, 2)
         v_in = batch['video']
         #print(v_in.shape)
-        v_in = v_in.reshape(-1, v_in.shape[2], v_in.shape[3],  v_in.shape[4])
         act_in = batch['actions']
         label_in = batch['label'].reshape(-1)
         stim_in = batch['stimulus'].reshape(-1)
@@ -62,29 +61,13 @@ def main(args):
         contacts += [contact_in]
         stimulus.extend(stim_in)
         
-        v_in_processed = []
-        for i_c, c in enumerate(c_in):
-            if c - 25 < 0:
-                v_entry = v_in[i_c, :50]
-            elif c + 25 > 201:
-                v_entry = v_in[i_c, -50:]
-            else:
-                v_entry = v_in[i_c, c-25:c+25]
+        v_in = v_in[:, :, :50]
                 
-            if v_entry.shape[0] < 50:
-                pad_width = ((0, 50 - v_in.shape[0]), (0, 0), (0, 0))
-                # Pad the array
-                v_entry = np.pad(v_entry, pad_width, mode='constant', constant_values=0)
-
-            v_in_processed += [v_entry]
-
-        #if args.embeddings == 'h':
-        v_in_processed = np.stack(v_in_processed)
-        v_in = v_in_processed.reshape(8, -1, 
-                                      v_in_processed.shape[1], 
-                                      v_in_processed.shape[2],  
-                                      v_in_processed.shape[3])
-
+        if v_in.shape[2] < 50:
+            pad_width = ((0, 0), (0, 0), (0, 50 - v_in.shape[2]), (0, 0), (0, 0))
+            # Pad the array
+            v_in = np.pad(v_in, pad_width, mode='constant', constant_values=0)
+            
         h = readout_h_run(model, state, v_in, act_in, seed=args.seed)
         h = jax.device_get(h)
 
