@@ -519,6 +519,14 @@ with open('/ccn2/u/thekej/models/sgnn_physion/ocd_focussed/test_json.json', 'w')
 with open('/ccn2/u/thekej/models/sgnn_physion/ocd_focussed/test_scenario_map.json', 'w') as f:
     json.dump(all_scenarios, f)
 
+max_dim = max([x.shape[0] for x in simulation])
+
+for ct, f in enumerate(simulation):
+    num_dims = f.ndim
+    padding = [(0, 0)] * num_dims
+    padding[0] = (0, max_dim - f.shape[0])  # Pad the second dimension
+    simulation[ct] = np.pad(f, padding, mode='constant')
+
 print('save 4')
 with h5py.File(args.save_file_sim ,'w') as hf:
     hf.create_dataset("features", data=np.stack(simulation))

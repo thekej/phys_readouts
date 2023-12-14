@@ -93,10 +93,6 @@ parser.add_argument('--relation_dim', type=int, default=0)
 parser.add_argument('--interactive', type=int, default=0)
 parser.add_argument('--saveavi', type=int, default=0)
 parser.add_argument('--save_pred', type=int, default=1)
-parser.add_argument('--save_file_ocp', type=str)
-parser.add_argument('--save_file_ocd', type=str)
-parser.add_argument('--save_file_focused', type=str)
-parser.add_argument('--save_file_sim', type=str)
 
 args = parser.parse_args()
 
@@ -216,7 +212,7 @@ dt = args.training_fpt * args.dt
 trial_full_paths = []
 #for arg_name in arg_names:
 #    trial_full_paths.append(os.path.join(args.dataf, arg_name))
-data_root = '/ccn2/u/thekej/sgnn_readout/train/data_balanced/'
+data_root = '/ccn2/u/thekej/sgnn_readout/test/data_balanced/'
 trial_full_paths = glob.glob(os.path.join(data_root, "*/*"))
 #trial_full_paths = list(os.walk(data_root))
 trial_full_paths = trial_full_paths#[3000:3010]
@@ -227,6 +223,7 @@ ocp, ocd, ocd_focused, simulation = [], [], [], []
 labels = []
 contacts = []
 filenames = []
+frame_labels = []
 stimulus_map = {}
 all_scenarios = {'collide': [], 'drop': [], 'support': [], 'link': [], 'roll': [], 'contain': [],
                          'dominoes': []}
@@ -258,10 +255,7 @@ for trial_id, trial_name in enumerate(trial_full_paths):
     phases_dict["trial_dir"] = trial_name
     labels += [phases_dict["label"]]
     contacts += [phases_dict["contact"]]
-    frame_label = phases_dict["collision_ind"]
-
-    if frame_label == max_timestep:
-        frame_label = max_timestep / 2
+    frame_labels += [phases_dict["collision_ind"]]
 
     if args.test_training_data_processing:
         is_bad_chair = correct_bad_chair(phases_dict)
@@ -305,102 +299,14 @@ for trial_id, trial_name in enumerate(trial_full_paths):
         
     n_actual_frames = len(timesteps)
     
-    # used for training heuristic on  detection
-    indices_ocd_focussed = [frame_label]
-
-    indices_ocd = np.arange(1, n_actual_frames, 40 // 10)
-    
-
     if 'collide' in trial_name:
         max_frame = 15
     else:
         max_frame = 45
-
-    indices_ocp = np.arange(max_frame, 0, -40 // 10).clip(0, n_actual_frames - 1)[::-1]
-    if len(indices_ocp) < 12:
-        indices_ocp = np.concatenate([np.array([indices_ocp[0]] * (12 - len(indices_ocp))), 
-                                      indices_ocp])
         
     indices_sim = np.arange(max_frame, 225, 40//10).clip(1, n_actual_frames - 1)
-
     
-    ocp_entry, ocd_entry, focus_entry = [], [], []
-    for entry, start_timestep in enumerate(range(1, n_actual_frames)):
-        
-        ocp_flag, ocd_flag, focus_flag = False, False, False
-        if entry in indices_ocp:
-            ocp_flag = True
-        if entry in indices_ocd:
-            ocd_flag = True
-        if entry in indices_ocd_focussed:
-            focus_flag = True
-            
-        if not ocp_flag and not ocd_flag and not focus_flag:
-            continue
-        
-        # model rollout
-        start_id = 1  # 5
-        if n_actual_frames < start_timestep:
-            start_timestep = n_actual_frames - 1
-        data_path = os.path.join(trial_name, f'{start_timestep}.h5')
-
-        data = load_data_dominoes(data_names, data_path, phases_dict)
-        if args.rand_rot:
-            data[0] = np.matmul((data[0] - center), Q) + center
-        data_path_prev = os.path.join(trial_name, f'{int(start_timestep - args.training_fpt)}.h5')
-        data_prev = load_data_dominoes(data_names, data_path_prev, phases_dict)
-        if args.rand_rot:
-            data_prev[0] = np.matmul((data_prev[0] - center), Q) + center
-        _, data = recalculate_velocities([data_prev, data], dt, data_names)
-
-
-        x = data[0]
-        v = data[1]
-        h = np.zeros((x.shape[0], 4))
-        obj_id = np.zeros_like(x)[..., 0]
-        obj_type = []
-        instance_idx = phases_dict['instance_idx']
-        for i in range(len(instance_idx) - 1):
-            obj_id[instance_idx[i]:instance_idx[i + 1]] = i
-            obj_type.append(phases_dict['material'][i])
-            if phases_dict['material'][i] == 'rigid':
-                h[instance_idx[i]:instance_idx[i + 1], 0] = 1
-            elif phases_dict['material'][i] in ['cloth', 'fluid']:
-                h[instance_idx[i]:instance_idx[i + 1], 1] = 1
-        x = torch.Tensor(x)
-        v = torch.Tensor(v)
-        h = torch.Tensor(h)
-        obj_id = torch.LongTensor(obj_id)
-
-        buf = [x, v, h, obj_id]
-
-        with torch.set_grad_enabled(False):
-            for d in range(len(buf)):
-                if type(buf[d]) == list:
-                    for t in range(len(buf[d])):
-                        buf[d][t] = Variable(buf[d][t].cuda())
-                else:
-                    buf[d] = Variable(buf[d].cuda())
-
-            x, v, h, obj_id = buf
-            feats = model.extract_objects(x, v, h, obj_id, obj_type, phases_dict['yellow_id'], phases_dict['red_id'])
-            #feats = model.extract(x, v, h, obj_id, obj_type)
-            if ocp_flag:
-                ocp_entry += [feats.cpu().numpy()]
-            if ocd_flag:
-                ocd_entry += [feats.cpu().numpy()]
-            if focus_flag:
-                focus_entry += [feats.cpu().numpy()]
-            
-    if len(ocp_entry) < 12:
-        ocp_entry = np.concatenate([np.array([ocp_entry[0]] * (12 - len(ocp_entry))),
-                                               ocp_entry])
-
-    ocp += [np.stack(ocp_entry)]
-    ocd += [np.stack(ocd_entry)]
-    ocd_focused += [np.stack(focus_entry)]
-    
-    sim = ocp_entry
+    sim = []
     
     for current_fid in range(45, min(n_actual_frames, 225)):
         x = data[0]
@@ -441,8 +347,8 @@ for trial_id, trial_name in enumerate(trial_full_paths):
             x, v, h, obj_id = buf
 
             vels, feats = model(x, v, h, obj_id, obj_type, phases_dict['yellow_id'], phases_dict['red_id'])
-            if current_fid in indices_sim:
-                sim += [feats.cpu().numpy()]
+            #if current_fid in indices_sim:
+            sim += [feats.cpu().numpy()]
                 
         vels = denormalize([vels.data.cpu().numpy()], [stat[1]])[0]
         if args.ransac_on_pred:
@@ -466,61 +372,9 @@ for trial_id, trial_name in enumerate(trial_full_paths):
             data[1][:, :args.position_dim] = vels
 
     simulation += [np.stack(sim)]
-
+    
 max_dim = max([x.shape[0] for x in ocd])
 
-for ct, f in enumerate(ocd):
-    # Get the number of dimensions
-    num_dims = f.ndim
-    # Create a padding configuration that respects the tensor's dimensions
-    # The padding is zero for all dimensions except for the second one.
-    padding = [(0, 0)] * num_dims
-    padding[0] = (0, max_dim - f.shape[0])  # Pad the second dimension
-
-    # Apply padding and update the list item
-    ocd[ct] = np.pad(f, padding, mode='constant')
-
-dt = h5py.special_dtype(vlen=str)
-
-print('save 1')
-with h5py.File(args.save_file_ocp,'w') as hf:
-    hf.create_dataset("features", data=np.stack(ocp))
-    hf.create_dataset("label", data=np.array(labels))
-    hf.create_dataset("contacts", data=np.concatenate(contacts))
-    hf.create_dataset("filenames", data=filenames, dtype=dt)
-    
-import json
-with open('/ccn2/u/thekej/models/sgnn_physion/ocp/train_json.json', 'w') as f:
-    json.dump(stimulus_map, f)
-    
-with open('/ccn2/u/thekej/models/sgnn_physion/ocp/train_scenario_map.json', 'w') as f:
-    json.dump(all_scenarios, f)
-
-print('save 2')
-with h5py.File(args.save_file_ocd ,'w') as hf:
-    hf.create_dataset("features", data=np.stack(ocd))
-    hf.create_dataset("label", data=np.array(labels))
-    hf.create_dataset("contacts", data=np.concatenate(contacts))
-    hf.create_dataset("filenames", data=filenames, dtype=dt)
-    
-with open('/ccn2/u/thekej/models/sgnn_physion/ocd/train_json.json', 'w') as f:
-    json.dump(stimulus_map, f)
-    
-with open('/ccn2/u/thekej/models/sgnn_physion/ocd/train_scenario_map.json', 'w') as f:
-    json.dump(all_scenarios, f)
-
-print('save 3')
-with h5py.File(args.save_file_focused ,'w') as hf:
-    hf.create_dataset("features", data=np.stack(ocd_focused))
-    hf.create_dataset("label", data=np.array(labels))
-    hf.create_dataset("contacts", data=np.concatenate(contacts))
-    hf.create_dataset("filenames", data=filenames, dtype=dt)
-
-with open('/ccn2/u/thekej/models/sgnn_physion/ocd_focussed/train_json.json', 'w') as f:
-    json.dump(stimulus_map, f)
-    
-with open('/ccn2/u/thekej/models/sgnn_physion/ocd_focussed/train_scenario_map.json', 'w') as f:
-    json.dump(all_scenarios, f)
 
 max_dim = max([x.shape[0] for x in simulation])
 
@@ -531,16 +385,15 @@ for ct, f in enumerate(simulation):
     simulation[ct] = np.pad(f, padding, mode='constant')
 
 print('save 4')
-with h5py.File(args.save_file_sim ,'w') as hf:
+with h5py.File('/ccn2/u/thekej/models/sgnn_physion/sim_focussed_tester/test_features.hdf5' ,'w') as hf:
     hf.create_dataset("features", data=np.stack(simulation))
     hf.create_dataset("label", data=np.array(labels))
+    hf.create_dataset("collision_index", data=np.array(frame_labels))
     hf.create_dataset("contacts", data=np.concatenate(contacts))
     hf.create_dataset("filenames", data=filenames, dtype=dt)
 
-with open('/ccn2/u/thekej/models/sgnn_physion/sim/train_json.json', 'w') as f:
-    json.dump(stimulus_map, f)
-    
-with open('/ccn2/u/thekej/models/sgnn_physion/sim/train_scenario_map.json', 'w') as f:
+with open('/ccn2/u/thekej/models/sgnn_physion/sim_focussed_tester/test_json.json', 'w') as f:
     json.dump(all_scenarios, f)
     
-
+with open('/ccn2/u/thekej/models/sgnn_physion/sim_focussed_tester/test_scenario_map.json', 'w') as f:
+    json.dump(stimulus_map, f)
