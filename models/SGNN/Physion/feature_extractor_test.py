@@ -390,8 +390,8 @@ for trial_id, trial_name in enumerate(trial_full_paths):
                 ocp_entry += [feats.cpu().numpy()]
             if ocd_flag:
                 ocd_entry += [feats.cpu().numpy()]
-            if focus_flag:
-                focus_entry += [feats.cpu().numpy()]
+                
+            focus_entry += [feats.cpu().numpy()]
             
     if len(ocp_entry) < 12:
         ocp_entry = np.concatenate([np.array([ocp_entry[0]] * (12 - len(ocp_entry))),
