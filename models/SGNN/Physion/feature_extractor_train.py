@@ -402,7 +402,7 @@ for trial_id, trial_name in enumerate(trial_full_paths):
     ocd_focused += [np.stack(focus_entry)]
     
     sim = ocp_entry
-    sim_tester = []
+    sim_tester = [ocp_entry[-1]]
     
     start_timestep = 45
     if n_actual_frames < start_timestep:
