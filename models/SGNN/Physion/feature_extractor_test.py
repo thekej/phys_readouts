@@ -402,7 +402,7 @@ for trial_id, trial_name in enumerate(trial_full_paths):
     ocd_focused += [np.stack(focus_entry)]
     
     sim = ocp_entry
-    sim_tester = []
+    sim_tester = [ocp_entry[-1]]
     
     start_timestep = 45
     if n_actual_frames < start_timestep:
@@ -559,7 +559,7 @@ with h5py.File(args.save_file_sim ,'w') as hf:
     hf.create_dataset("features", data=np.stack(simulation))
     hf.create_dataset("features_tester", data=np.stack(simulation_tester))
     hf.create_dataset("label", data=np.array(labels))
-    hf.create_dataset("frame_labels", data=np.array(labels))
+    hf.create_dataset("frame_labels", data=np.array(frame_labels))
     hf.create_dataset("contacts", data=np.concatenate(contacts))
     hf.create_dataset("filenames", data=filenames, dtype=dt)
 
