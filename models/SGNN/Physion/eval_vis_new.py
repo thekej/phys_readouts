@@ -207,32 +207,17 @@ if args.save_pred:
         pred_gif_folder = os.path.join(evalf_root, "ransacOnPred-" + mode +  scenario)
     mkdir(pred_gif_folder)
 
-accs = {'0.1': [], '0.12': [], '0.13': [], '0.14': [],
-        '0.15': [], '0.06': [], '0.07': [], '0.08': [],
-        '0.09': [], '0.11': []}
 recs = []
 
 dt = args.training_fpt * args.dt
 
 #gt_preds = []
-#arg_names = [file for file in os.listdir(args.dataf) if not file.endswith("txt")]
 trial_full_paths = []
-#for arg_name in arg_names:
-#    trial_full_paths.append(os.path.join(args.dataf, arg_name))
 data_root = '/ccn2/u/thekej/sgnn_readout/test/data_balanced/'
 trial_full_paths = glob.glob(os.path.join(data_root, "*/*"))
-#trial_full_paths = list(os.walk(data_root))
-trial_full_paths = trial_full_paths#[3000:3010]
+trial_full_paths = trial_full_paths[:10]
 #trial_full_paths = random.sample(trial_full_paths, 50)
 
-title = ['Model', 'Readout Train Data', 'Readout Test Data', 'Train Accuracy', 
-              'Test Accuracy', 'Readout Type', 'Predicted Prob_false', 
-              'Predicted Prob_true', 'Predicted Outcome', 'Actual Outcome', 
-              'Stimulus Name']
-
-results = {'0.1': [title], '0.12': [title], '0.13': [title], '0.14': [title], 
-           '0.15': [title], '0.06': [title], '0.07': [title], '0.08': [title], 
-           '0.09': [title], '0.11': [title]}
 
 for trial_id, trial_name in enumerate(trial_full_paths):
     print('processing case', trial_id, 'total', len(trial_full_paths))
@@ -452,70 +437,6 @@ for trial_id, trial_name in enumerate(trial_full_paths):
                 data[0] = p_gt[current_fid + 1].copy()
                 data[1][:, :args.position_dim] = v_nxt_gt[current_fid]
 
-        import scipy
-        #spacing = 0.05
-        for spacing in [0.06]:#, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12, 0.13, 0.14, 0.15]:
-            st0, st1, st2 = instance_idx[0], instance_idx[1], instance_idx[2]
-            obj_0_pos = p_pred[-1][st0:st1, :]
-            obj_1_pos = p_pred[-1][st1:st2, :]
-
-            sim_mat = scipy.spatial.distance_matrix(obj_0_pos, obj_1_pos, p=2)
-            min_dist1=np.min(sim_mat)
-            pred_target_contacting_zone = min_dist1 < spacing
-
-            obj_0_pos = p_gt[-1][st0:st1, :]
-            obj_1_pos = p_gt[-1][st1:st2, :]
-
-            sim_mat = scipy.spatial.distance_matrix(obj_0_pos, obj_1_pos, p=2)
-            min_dist2= np.min(sim_mat)
-            gt_target_contacting_zone = min_dist2 < spacing * 0.8
-            acc = int(gt_target_contacting_zone == pred_target_contacting_zone)
-
-            accs[str(spacing)].append(acc)
-            print(args.dataf)
-            print("gt vs pred:", gt_target_contacting_zone, pred_target_contacting_zone, min_dist2, min_dist1)
-            print("Spacing: ", spacing, ", accuracy:", np.mean(accs[str(spacing)]))
-
-
-            scenarios = ''
-            print(trial_name)
-            if 'collide_all_movies' in trial_name:
-                scenarios = 'collide'
-            elif 'roll_all_movies' in trial_name:
-                scenarios = 'roll'
-            elif 'dominoes_all_movies' in trial_name:
-                scenarios = 'domino'
-            elif 'link_all_movies' in trial_name:
-                scenarios = 'link'
-            elif 'support_all_movies' in trial_name:
-                scenarios = 'towers'
-            elif 'contain_all_movies' in trial_name:
-                scenarios = 'contain'
-            elif 'drop_all_movies' in trial_name:
-                scenarios = 'drop'
-
-            pred_false = 1.0 if not pred_target_contacting_zone else 0.0
-            pred_true = 1.0 if pred_target_contacting_zone else 0.0
-
-            entry = ['sgnn_physion', 'all', scenarios, 0.5, 0.5,
-                     'observed_sgnn', pred_false, pred_true, int(pred_target_contacting_zone),
-                     int(gt_target_contacting_zone), trial_name.split('/')[-1]]
-
-            results[str(spacing)].append(entry)
-            filename = f'sgnn_physion_observed_{spacing}.csv'
-            with open(filename, 'w', newline='') as file:
-                writer = csv.writer(file)
-                writer.writerows(results[str(spacing)])
-
-'''   
-    for i in range(len(results)):
-        results[i][4] = np.mean(accs)
-        results[i][3] = np.mean(accs)
-    filename = 'sgnn_physion_observed_0_05.csv'
-    with open(filename, 'w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerows(results)
-
     
     # render in VisPy
     import vispy.scene
@@ -588,15 +509,15 @@ for trial_id, trial_name in enumerate(trial_full_paths):
     # view.add(line)
     # set animation
     t_step = 0
-    '''
 
-'''
+
+    '''
     set up data for rendering
     '''
     # 0 - p_pred: seq_length x n_p x 3
     # 1 - p_gt: seq_length x n_p x 3
     # 2 - s_gt: seq_length x n_s x 3
-'''
+
     print('p_pred', p_pred.shape)
     print('p_gt', p_gt.shape)
     print('s_gt', s_gt.shape)
@@ -726,5 +647,4 @@ for trial_id, trial_name in enumerate(trial_full_paths):
             os.path.join(pred_gif_folder, '%s_vid_%d_vispy.gif' % (prefix, idx_episode)),
             imgs, fps=20)
         print(os.path.join(pred_gif_folder, '%s_vid_%d_vispy.gif' % (prefix, idx_episode)))
-'''
     
