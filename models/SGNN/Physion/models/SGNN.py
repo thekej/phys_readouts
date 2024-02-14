@@ -58,7 +58,7 @@ class SGNN(nn.Module):
                 raise RuntimeError('Unknown object material')
         return ret
 
-    def forward(self, x_p, v_p, h_p, obj_id, obj_type, obj_yellow, obj_red):
+    def forward(self, x_p, v_p, h_p, obj_id, obj_type):
         try:
             h_p[x_p[..., 1] < 0.1, -1] = 1
         except:
@@ -102,7 +102,7 @@ class SGNN(nn.Module):
         # reorder given yellow and red first
         # pad to max number of objects
         # Get the elements at index1 and index2
-        result = get_obj_feats(s_o_, obj_yellow, obj_red)
+        #result = get_obj_feats(s_o_, obj_yellow, obj_red)
         
         edge_attr_inner_f = (x_p[edge_index_inner[0]] - x_p[edge_index_inner[1]]).unsqueeze(-1)  # [M_in, 3, 1]
         f_p_ = torch.cat((f_o_[obj_id], f_p), dim=-1)
@@ -116,7 +116,7 @@ class SGNN(nn.Module):
 
         f_p_, s_p_ = self.object_to_particle(f_p_, s_p_, edge_index_inner, edge_attr_inner_f)  # [N, 3, x], [N, H]
         v_out = self.predictor(x_p, f_p_, s_p_, obj_id, obj_type, num_obj)  # [N, 3]
-        return v_out, result
+        return v_out
     
     def extract(self, x_p, v_p, h_p, obj_id, obj_type):
         try:

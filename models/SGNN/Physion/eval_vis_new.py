@@ -1,3 +1,5 @@
+## run wih python eval_vis_new.py --env TDWdominoes --ransac_on_pred 1 --pred_only 1 --epoch 773 --iter 13000 --rand_rot 0 --model_name SGNN --training_fpt 1 --mode "test" --floor_cheat 1 --test_training_data_processing 1 --gt_only 0 --modelf /ccn2/u/thekej/sgnn_out_dir/3_layer_512_1e_5/dump/ --savemp4 1
+
 import os
 import cv2
 import sys
@@ -94,6 +96,8 @@ parser.add_argument('--relation_dim', type=int, default=0)
 #visualization
 parser.add_argument('--interactive', type=int, default=0)
 parser.add_argument('--saveavi', type=int, default=0)
+parser.add_argument('--savemp4', type=int, default=0)
+parser.add_argument('--both_viz', type=int, default=0)
 parser.add_argument('--save_pred', type=int, default=1)
 
 args = parser.parse_args()
@@ -202,9 +206,10 @@ data_name = args.dataf.split("/")[-1]
 if args.save_pred:
 
     pred_gif_folder = os.path.join(evalf_root, mode + "-"+ scenario)
+    
 
     if args.ransac_on_pred:
-        pred_gif_folder = os.path.join(evalf_root, "ransacOnPred-" + mode +  scenario)
+        pred_gif_folder = os.path.join(evalf_root, "gt-ransacOnPred-" + mode +  scenario)
     mkdir(pred_gif_folder)
 
 recs = []
@@ -215,7 +220,7 @@ dt = args.training_fpt * args.dt
 trial_full_paths = []
 data_root = '/ccn2/u/thekej/sgnn_readout/test/data_balanced/'
 trial_full_paths = glob.glob(os.path.join(data_root, "*/*"))
-trial_full_paths = trial_full_paths[:10]
+trial_full_paths = trial_full_paths
 #trial_full_paths = random.sample(trial_full_paths, 50)
 
 
@@ -241,10 +246,10 @@ for trial_id, trial_name in enumerate(trial_full_paths):
     print("Rollout %d / %d" % (trial_id, len(trial_full_paths)))
 
     timesteps = [t for t in range(0, args.time_step - int(args.training_fpt), int(args.training_fpt))]
-    if len(timesteps) > 150:
-        timesteps = [t for t in range(0, 150, int(args.training_fpt))]
+    #if len(timesteps) > 150:
+    #    timesteps = [t for t in range(0, 150, int(args.training_fpt))]
     max_timestep = len(timesteps)
-    total_nframes = 150#max_timestep  # len(timesteps)
+    total_nframes = max_timestep  # len(timesteps) #225 for sim
 
     if args.env == "TDWdominoes":
         pkl_path = os.path.join(trial_name, 'phases_dict.pkl')
@@ -343,6 +348,9 @@ for trial_id, trial_name in enumerate(trial_full_paths):
         # model rollout
         start_timestep = 45  # 15
         start_id = 45  # 5
+        if "Collide" in trial_name:
+            start_timestep = 15  # 15
+            start_id = 15  # 5
         if n_actual_frames < start_id:
             start_timestep = n_actual_frames - 1
         data_path = os.path.join(trial_name, f'{start_timestep}.h5')
@@ -361,7 +369,7 @@ for trial_id, trial_name in enumerate(trial_full_paths):
             p_pred[t] = p_gt[t]
             # node_rs_idxs.append(gt_node_rs_idxs[t])
 
-        for current_fid in range(150 - start_id):
+        for current_fid in range(225 - start_id):
             if current_fid % 10 == 0:
                 print("Step %d / %d" % (current_fid + start_id, total_nframes))
             p_pred[start_id + current_fid] = data[0]
@@ -402,7 +410,7 @@ for trial_id, trial_name in enumerate(trial_full_paths):
                         else:
                             buf[d] = Variable(buf[d])
                 x, v, h, obj_id = buf
-                print(x.shape, v.shape, h.shape)
+
                 vels = model(x, v, h, obj_id, obj_type)
                 if args.debug:
                     data_nxt_path = os.path.join(trial_name, str(step + args.training_fpt) + '.h5')
@@ -410,7 +418,6 @@ for trial_id, trial_name in enumerate(trial_full_paths):
                     label = Variable(torch.FloatTensor(data_nxt[1][:n_particles]).cuda())
                     # print(label)
                     loss = np.sqrt(criterionMSE(vels, label).item())
-                    print(loss)
 
             vels = denormalize([vels.data.cpu().numpy()], [stat[1]])[0]
             if args.ransac_on_pred:
@@ -539,7 +546,9 @@ for trial_id, trial_name in enumerate(trial_full_paths):
             t_actual = t_step
             colors = convert_groups_to_colors(
                 phases_dict["instance_idx"],
-                instance_colors=instance_colors, env=args.env)
+                instance_colors=instance_colors, 
+                special_ids=[phases_dict['yellow_id'], phases_dict['red_id']],
+                env=args.env)
             colors = np.clip(colors, 0., 1.)
             n_particle = phases_dict["instance_idx"][-1]
             p1.set_data(p_gt[t_actual, :n_particle], size=particle_size, edge_color='black', face_color=colors)
@@ -559,7 +568,9 @@ for trial_id, trial_name in enumerate(trial_full_paths):
 
             colors = convert_groups_to_colors(
                 phases_dict["instance_idx"],
-                instance_colors=instance_colors, env=args.env)
+                instance_colors=instance_colors,
+                special_ids=[phases_dict['yellow_id'], phases_dict['red_id']],
+                env=args.env)
 
             colors = np.clip(colors, 0., 1.)
             n_particle = phases_dict["instance_idx"][-1]
@@ -594,26 +605,104 @@ for trial_id, trial_name in enumerate(trial_full_paths):
             update(1)
 
     print("Render video for dynamics prediction")
-    idx_episode = trial_id
+    idx_episode  = trial_id
     if args.saveavi:
         import cv2
 
         fourcc = cv2.VideoWriter_fourcc(*'MJPG')
 
         out = cv2.VideoWriter(
-            os.path.join(args.evalf, 'vid_%d_vispy.avi' % (idx_episode)),
-            fourcc, 20, (800, 600))
+            os.path.join(pred_gif_folder, '%s.avi' % (trial_name.split('/')[-1])),
+            fourcc, 100, (800, 600))
 
         for step in range(vis_length):
-            gt_path = os.path.join('vispy', 'gt_%d_%d.png' % (idx_episode, step))
-            # pred_path = os.path.join(args.evalf, 'vispy', 'pred_%d_%d.png' % (idx_episode, step))
-            gt = cv2.imread(gt_path)
-            # pred = cv2.imread(pred_path)
-            frame = np.zeros((600, 800, 3), dtype=np.uint8)
-            frame[:, :800] = gt
-            # frame[:, 800:] = pred
+            gt_path = os.path.join(vispy_dir, 'gt_%d_%d.png' % (idx_episode, step))
+            pred_path = os.path.join(vispy_dir, 'pred_%d_%d.png' % (idx_episode, step))
+            if step < 45:
+                gt = cv2.imread(gt_path)
+                frame = np.zeros((600, 800, 3), dtype=np.uint8)
+                frame[:, :800] = gt
+            else:
+                pred = cv2.imread(pred_path)
+                frame = np.zeros((600, 800, 3), dtype=np.uint8)
+                frame[:, :800] = pred
             out.write(frame)
         out.release()
+    elif args.savemp4:
+        import cv2
+        import os
+
+        # Use 'mp4v' as the codec for MP4 files
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    
+        # Change the file extension from .avi to .mp4
+        out = cv2.VideoWriter(
+            os.path.join(pred_gif_folder, '%s.mp4' % (trial_name.split('/')[-1])),
+            fourcc, 100, (800, 600))
+    
+        for step in range(vis_length):
+            gt_path = os.path.join(vispy_dir, 'gt_%d_%d.png' % (idx_episode, step))
+            pred_path = os.path.join(vispy_dir, 'pred_%d_%d.png' % (idx_episode, step))
+            if step < 45 or args.gt_only:
+                gt = cv2.imread(gt_path)
+                frame = np.zeros((600, 800, 3), dtype=np.uint8)
+                frame[:, :800] = gt
+            else:
+                pred = cv2.imread(pred_path)
+                frame = np.zeros((600, 800, 3), dtype=np.uint8)
+                frame[:, :800] = pred
+            out.write(frame)
+        out.release()
+
+    elif args.both_viz:
+        import cv2
+        import os
+        import numpy as np
+        
+        # Assuming vis_length is the length of the pred video (225 frames as mentioned)
+        # Assuming gt_length is the length of the ground truth video, which is variable
+        pred_vid_folder = os.path.join(evalf_root, "both-ransacOnPred-" + mode +  scenario)
+        mkdir(pred_vid_folder)
+        
+        # Use 'mp4v' as the codec for MP4 files
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        
+        # Change the file extension from .avi to .mp4 and adjust to create side by side video
+        out = cv2.VideoWriter(
+            os.path.join(pred_vid_folder, '%s.mp4' % (trial_name.split('/')[-1])),
+            fourcc, 100, (1600, 600))  # Width is doubled to accommodate both videos side by side
+
+        gt_length = p_gt.shape[0]
+        
+        for step in range(max(vis_length, gt_length)):
+            if step < gt_length:
+                gt_path = os.path.join(vispy_dir, 'gt_%d_%d.png' % (idx_episode, step))
+                gt = cv2.imread(gt_path)
+            # For gt video shorter than pred, repeat the last gt frame
+            elif gt_length > 0:  # Ensure gt_length is not zero to avoid indexing error
+                gt_path = os.path.join(vispy_dir, 'gt_%d_%d.png' % (idx_episode, gt_length - 1))
+                gt = cv2.imread(gt_path)
+
+            if step < 45:
+                pred = gt
+            elif step < vis_length and step > 45:
+                pred_path = os.path.join(vispy_dir, 'pred_%d_%d.png' % (idx_episode, step))
+                pred = cv2.imread(pred_path)
+            # For pred video shorter than gt, this scenario is handled by ensuring vis_length is max
+            else:
+                pred_path = os.path.join(vispy_dir, 'pred_%d_%d.png' % (idx_episode, vis_length - 1))
+                pred = cv2.imread(pred_path)
+        
+            # Ensure both frames are the same size and combine them
+            frame = np.zeros((600, 1600, 3), dtype=np.uint8)  # Adjusted for side by side
+            frame[:, :800] = gt if gt is not None else np.zeros((600, 800, 3), dtype=np.uint8)
+            frame[:, 800:1600] = pred if pred is not None else np.zeros((600, 800, 3), dtype=np.uint8)
+        
+            out.write(frame)
+        
+        out.release()
+
+    
     else:
         import imageio
         gt_imgs = []
@@ -642,9 +731,9 @@ for trial_id, trial_name in enumerate(trial_full_paths):
             imgs = []
             for img_id in range(nimgs):
                 imgs.append(np.concatenate([gt_imgs[img_id], pred_imgs[img_id]], axis=1))
-
+        
         out = imageio.mimsave(
             os.path.join(pred_gif_folder, '%s_vid_%d_vispy.gif' % (prefix, idx_episode)),
-            imgs, fps=20)
+            imgs, fps=1000)
         print(os.path.join(pred_gif_folder, '%s_vid_%d_vispy.gif' % (prefix, idx_episode)))
     
