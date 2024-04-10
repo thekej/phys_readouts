@@ -69,7 +69,7 @@ class ResnetFC(nn.Module):
         d_out=4,
         n_blocks=5,
         d_latent=0,
-        d_hidden=128,
+        d_hidden=512,
         beta=0.0,
         combine_layer=1000,
         combine_type="average",
@@ -189,7 +189,7 @@ class ResnetFC(nn.Module):
         return cls(
             d_in,
             n_blocks=conf.get_int("n_blocks", 5),
-            d_hidden=conf.get_int("d_hidden", 128),
+            d_hidden=conf.get_int("d_hidden", 512),
             beta=conf.get_float("beta", 0.0),
             combine_layer=conf.get_int("combine_layer", 1000),
             combine_type=conf.get_string("combine_type", "average"),  # average | max

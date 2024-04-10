@@ -1,5 +1,5 @@
 # run: conda env create -f environment.yml
-name: pixelnerf
+name: pnerf
 channels:
   - pytorch
   - defaults

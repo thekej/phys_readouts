@@ -149,7 +149,7 @@ class PN_LSTM_OCD(PN_LSTM):
         super().__init__(weights_path, full_rollout=True)
 
     def transform(self):
-        return Transform(rescale_size=64), 60, 66
+        return Transform(rescale_size=64), 10, 801
 
 class PN_LSTM_SIM(PN_LSTM):
     def __init__(self, weights_path):
