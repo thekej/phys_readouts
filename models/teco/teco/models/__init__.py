@@ -1,6 +1,6 @@
 import jax.numpy as jnp
 
-from .sample import sample, readout_z_run, readout_h_run
+from .sample import sample, sample_plausibility, readout_z_run, readout_h_run
 from .vqgan import VQGAN
 from .vae import VAE
 from .teco import TECO

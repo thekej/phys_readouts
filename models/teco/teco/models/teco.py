@@ -100,9 +100,12 @@ class TECO(nn.Module):
         return mask
 
     def encode(self, encodings):
+        print(encodings.shape)
         embeddings = self.vq_fns['lookup'](encodings)
         sos = jnp.tile(self.sos_post[None, None], (embeddings.shape[0], 1, 1, 1, 1))
-        sos = jnp.asarray(sos, self.dtype)   
+        sos = jnp.asarray(sos, self.dtype)
+        print('s', sos.shape)
+        print('embeds: ', embeddings.shape)
         embeddings = jnp.concatenate([sos, embeddings], axis=1)
         inp = jnp.concatenate([embeddings[:, :-1], embeddings[:, 1:]], axis=-1)
  

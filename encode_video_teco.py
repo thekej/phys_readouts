@@ -96,7 +96,7 @@ def encode_image(x, model, state):
 
     return out
 
-def process_video(video_file, original_fps=100, new_fps=25):
+def process_video(video_file, original_fps=100, new_fps=100):
     with h5py.File(video_file, 'r') as f: # load ith hdf5 file from list
         frames = list(f['frames'])
         images = []
