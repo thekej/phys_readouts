@@ -199,11 +199,11 @@ class TECO(IntPhysFeatureExtractor):
 
         encoded_videos = np.stack(encoded_videos)
         print('inpu: ', encoded_videos.shape)
-        encoded_videos = encoded_videos.reshape(1, 1, encoded_videos.shape[1], 
+        encoded_videos = encoded_videos.reshape(8, 1, encoded_videos.shape[1], 
                                                 encoded_videos.shape[2], encoded_videos.shape[3])
         
-        preds = sample_plausibility(self.model, self.state, encoded_videos, actions, seed=0)
-
+        preds, targets = sample_plausibility(self.model, self.state, encoded_videos, actions, seed=0)
+        print(preds.shape, targets.shape)
         # Define the Mean Squared Error loss function (reduction='none' keeps the individual losses)
         mse_loss = nn.MSELoss(reduction='none')
 
