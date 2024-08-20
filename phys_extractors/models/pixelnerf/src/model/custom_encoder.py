@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import util
+import phys_extractors.models.pixelnerf.src.util as util
 
 
 class ConvEncoder(nn.Module):
