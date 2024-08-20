@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 import numpy as np
-from phys_extractors.models.pixelnerf.src.util as util
+import phys_extractors.models.pixelnerf.src.util as util
 
 
 class ImplicitNet(nn.Module):

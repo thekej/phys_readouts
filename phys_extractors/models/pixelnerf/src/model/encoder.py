@@ -5,7 +5,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 import torchvision
-from phys_extractors.models.pixelnerf.src.util as util
+import phys_extractors.models.pixelnerf.src.util as util
 from phys_extractors.models.pixelnerf.src.model.custom_encoder import ConvEncoder
 import torch.autograd.profiler as profiler
 
