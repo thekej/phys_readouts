@@ -15,7 +15,7 @@ from utils import *
 
 from phys_extractors.models.DFM_physion.PixelNeRF.pixelnerf_helpers import *
 from phys_extractors.models.DFM_physion.PixelNeRF.resnet import PixelNeRFTimeEmbed, BasicBlockTimeEmbed
-from .transformer.DiT import DiT
+from phys_extractors.models.DFM_physion.PixelNeRF.transformer.DiT import DiT
 
 
 class PixelNeRFModelCond(nn.Module):
