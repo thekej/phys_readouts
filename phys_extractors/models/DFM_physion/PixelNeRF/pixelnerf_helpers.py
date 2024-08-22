@@ -6,10 +6,10 @@ import os
 from einops import rearrange, repeat
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from PixelNeRF.renderer import *
-from PixelNeRF.resnetfc import *
+from phys_extractors.models.DFM_physion.PixelNeRF.renderer import *
+from phys_extractors.models.DFM_physion.PixelNeRF.resnetfc import *
 import numpy as np
-from PixelNeRF.resnetfc_time_embed import *
+from phys_extractors.models.DFM_physion.PixelNeRF.resnetfc_time_embed import *
 
 
 def pixel_aligned_features_cond(
