@@ -9,13 +9,13 @@ from einops import rearrange, repeat
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from layers import *
-from PixelNeRF.renderer import *
-from PixelNeRF.resnetfc import *
+from phys_extractors.models.DFM_physion.PixelNeRF.renderer import *
+from phys_extractors.models.DFM_physion.PixelNeRF.resnetfc import *
 from utils import *
 
-from PixelNeRF.pixelnerf_helpers import *
-from PixelNeRF.resnet import PixelNeRFTimeEmbed, BasicBlockTimeEmbed
-from PixelNeRF.transformer.DiT import DiT
+from phys_extractors.models.DFM_physion.PixelNeRF.pixelnerf_helpers import *
+from phys_extractors.models.DFM_physion.PixelNeRF.resnet import PixelNeRFTimeEmbed, BasicBlockTimeEmbed
+from phys_extractors.models.DFM_physion.PixelNeRF.transformer.DiT import DiT
 
 
 class PixelNeRFModelCond(nn.Module):

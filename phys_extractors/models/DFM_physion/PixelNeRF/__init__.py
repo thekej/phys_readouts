@@ -1,1 +1,1 @@
-from PixelNeRF.pixelnerf_model_cond import PixelNeRFModelCond
+from phys_extractors.models.DFM_physion.PixelNeRF.pixelnerf_model_cond import PixelNeRFModelCond
