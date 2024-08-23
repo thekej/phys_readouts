@@ -36,10 +36,14 @@ def parse_args():
 
 
 # Make and load model
-def load_model(ckpt_path, device=device):
+def load_model(ckpt_path, device=device, cfg_path=None):
     # Parse config file
-    with open(os.path.join(os.path.dirname(ckpt_path), 'config.yml'), 'r') as f:
+    if cfg_path:
+        with open(cfg_path, 'r') as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
+    else:
+        with open(os.path.join(os.path.dirname(ckpt_path), 'config.yml'), 'r') as f:
+            config = yaml.load(f, Loader=yaml.FullLoader)
     # Load config file
     config = dict2namespace(config)
     config.device = device
