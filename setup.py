@@ -1,17 +1,17 @@
 from setuptools import setup, find_packages, Extension
 import os
 
-# Function to find all C++ files in a directory
-def find_cpp_files(directory):
+# Function to find all C++ files in the entire project directory
+def find_cpp_files():
     cpp_files = []
-    for root, _, files in os.walk(directory):
+    for root, _, files in os.walk('.'):  # Start from the current directory
         for file in files:
             if file.endswith(".cpp"):
                 cpp_files.append(os.path.join(root, file))
     return cpp_files
 
-# Find all C++ files in the 'src' directory (replace 'src' with the relevant directory)
-cpp_files = find_cpp_files('src')
+# Find all C++ files in the entire project
+cpp_files = find_cpp_files()
 
 # Define the extension module
 phys_readouts_extension = Extension(
