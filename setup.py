@@ -6,7 +6,7 @@ setup(
     packages=find_packages(),  # Automatically finds all packages in the directory
     include_package_data=True,  # Include package data specified in MANIFEST.in
     package_data={
-        '': ['*.cpp'],  # Include all .cpp files in the package
+        '': ['*.cpp', '*.cu'],  # Include all .cpp files in the package
     },
 )
 
