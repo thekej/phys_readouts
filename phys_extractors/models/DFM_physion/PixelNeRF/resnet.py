@@ -280,31 +280,51 @@ class ResNetTimeEmbed(nn.Module):
 
         layers = []
         layers.append(
-            block(
-                self.inplanes,
-                planes,
-                stride,
-                downsample,
-                self.groups,
-                self.base_width,
-                previous_dilation,
-                norm_layer,
-                time_emb_dim=time_emb_dim,
-            ).cuda()
-        )
-        self.inplanes = planes * block.expansion
-        for _ in range(1, blocks):
-            layers.append(
                 block(
                     self.inplanes,
                     planes,
-                    groups=self.groups,
-                    base_width=self.base_width,
-                    dilation=self.dilation,
-                    norm_layer=norm_layer,
+                    stride,
+                    downsample,
+                    self.groups,
+                    self.base_width,
+                    previous_dilation,
+                    norm_layer,
                     time_emb_dim=time_emb_dim,
-                ).cuda()
+                ).cuda() if torch.cuda.is_available() else block(
+                    self.inplanes,
+                    planes,
+                    stride,
+                    downsample,
+                    self.groups,
+                    self.base_width,
+                    previous_dilation,
+                    norm_layer,
+                    time_emb_dim=time_emb_dim,
+                )
             )
+
+        self.inplanes = planes * block.expansion
+        for _ in range(1, blocks):
+            layers.append(
+                    block(
+                        self.inplanes,
+                        planes,
+                        groups=self.groups,
+                        base_width=self.base_width,
+                        dilation=self.dilation,
+                        norm_layer=norm_layer,
+                        time_emb_dim=time_emb_dim,
+                    ).cuda() if torch.cuda.is_available() else block(
+                        self.inplanes,
+                        planes,
+                        groups=self.groups,
+                        base_width=self.base_width,
+                        dilation=self.dilation,
+                        norm_layer=norm_layer,
+                        time_emb_dim=time_emb_dim,
+                    )
+                )
+
 
         return nn.Sequential(*layers)
         # return layers

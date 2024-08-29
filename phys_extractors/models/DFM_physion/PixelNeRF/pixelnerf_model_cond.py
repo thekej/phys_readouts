@@ -106,7 +106,9 @@ class PixelNeRFModelCond(nn.Module):
             backgrd_color=background_color,
             use_viewdir=use_viewdir,
             lindisp=render_settings["lindisp"],
-        ).cuda()
+        )
+        if torch.cuda.is_available():
+            self.renderer = self.renderer.cuda()
 
         # self.renderer_coarse = self.renderer
         self.renderer_coarse = VolumeRenderer(
@@ -117,13 +119,11 @@ class PixelNeRFModelCond(nn.Module):
             backgrd_color=background_color,
             use_viewdir=use_viewdir,
             lindisp=render_settings["lindisp"],
-        ).cuda()
+        )
+        if torch.cuda.is_available():
+            self.renderer_coarse = self.renderer_coarse.cuda()
 
         print("feats_cond", feats_cond)
-        # if self.feats_cond:
-        #     self.ctxt_feat_collector = NoVolumeRenderer(
-        #         near=near, far=far, n_samples=64, n_fine_samples=0, n_feats=512,
-        #     ).cuda()
 
         self.num_render_pixels = render_settings["num_pixels"]
         self.num_render_pixels_no_grad = (
@@ -456,9 +456,12 @@ class PixelNeRFModelCond(nn.Module):
         w = 128 if render_high_res else w
         print(f"render_poses {render_poses.shape}, {xy_pix.shape}")
         for i in range(n):
+            r_pose = render_poses[i : i + 1][:, None, ...]
+            if torch.cuda.is_available():
+                r_pose = r_pose.cuda()
             rgb, depth, feats = self.render_full_in_patches(
                 xy_pix[:num_videos],
-                render_poses[i : i + 1][:, None, ...].cuda(),
+                r_pose,
                 intrinsics[:num_videos],
                 rf_ctxt,
                 b=num_videos,
@@ -522,10 +525,12 @@ class PixelNeRFModelCond(nn.Module):
             # if i % 10 == 0:
             #     print(f"Rendering frame {i}/{n}", flush=True)
             # print(i)
+            r_pose = render_poses[i : i + 1][:, None, ...]
+            if torch.cuda.is_available():
+                r_pose = r_pose.cuda()
             rgb, depth, feats = self.render_full_in_patches(
                 xy_pix[:num_videos],
-                render_poses[i : i + 1][:, None, ...].cuda(),
-                # render_poses[0][i : i + 1][:, None, ...].cuda(),
+                r_pose,
                 intrinsics[:num_videos],
                 rf,
                 b=num_videos,

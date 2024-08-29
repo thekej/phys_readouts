@@ -115,7 +115,7 @@ class PixelNeRFModel(nn.Module):
                 print(f"Rendering frame {i}/{n}")
             rgb, depth = self.render_full_in_patches(
                 xy_pix[:1],
-                render_poses[i : i + 1][:, None, ...].cuda(),
+                render_poses[i : i + 1][:, None, ...].cuda() if torch.cuda.is_available() else render_poses[i : i + 1][:, None, ...],
                 intrinsics[:1],
                 rf,
                 1,
@@ -216,7 +216,14 @@ class PixelNeRFModelVanilla(PixelNeRFModel):
             n_fine_samples=64,
             backgrd_color=background_color,
             lindisp=lindisp,
-        ).cuda()
+        ).cuda() if torch.cuda.is_available() else VolumeRenderer(
+            near=near,
+            far=far,
+            n_samples=64,
+            n_fine_samples=64,
+            backgrd_color=background_color,
+            lindisp=lindisp,
+        )
         self.len_render = 20
         self.num_render_pixels = self.len_render ** 2  # 36 x36 pixels
         self.channels = channels
