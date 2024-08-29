@@ -11,11 +11,11 @@ from functools import partial
 import torch
 import torch.nn as nn
 
-from jepa.src.models.utils.patch_embed import PatchEmbed, PatchEmbed3D
-from jepa.src.models.utils.modules import Block
-from jepa.src.models.utils.pos_embs import get_2d_sincos_pos_embed, get_3d_sincos_pos_embed
-from jepa.src.utils.tensors import trunc_normal_
-from jepa.src.masks.utils import apply_masks
+from phys_extractors.models.jepa_physics.jepa.src.models.utils.patch_embed import PatchEmbed, PatchEmbed3D
+from phys_extractors.models.jepa_physics.jepa.src.models.utils.modules import Block
+from phys_extractors.models.jepa_physics.jepa.src.models.utils.pos_embs import get_2d_sincos_pos_embed, get_3d_sincos_pos_embed
+from phys_extractors.models.jepa_physics.jepa.src.utils.tensors import trunc_normal_
+from phys_extractors.models.jepa_physics.jepa.src.masks.utils import apply_masks
 
 
 class VisionTransformer(nn.Module):
