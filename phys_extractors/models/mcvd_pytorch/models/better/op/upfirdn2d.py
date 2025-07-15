@@ -128,7 +128,7 @@ def upfirdn2d(input, kernel, up=1, down=1, pad=(0, 0)):
                 ctx.g_pad = (g_pad_x0, g_pad_x1, g_pad_y0, g_pad_y1)
 
                 out = upfirdn2d_op.upfirdn2d(
-                    input, kernel, up_x, up_y, down_x, down_y, pad_x0, pad_x1, pad_y0, pad_y1
+                    input.half(), kernel.half(), up_x, up_y, down_x, down_y, pad_x0, pad_x1, pad_y0, pad_y1
                 )
                 # out = out.view(major, out_h, out_w, minor)
                 out = out.view(-1, channel, out_h, out_w)
